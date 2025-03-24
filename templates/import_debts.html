@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Импорт задолженностей | Система уведомлений</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">Система уведомлений</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" aria-current="page" href="/">Главная</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/students">Ученики</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/create_notification">Создать уведомление</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/import_debts">Импорт задолженностей</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>Импорт задолженностей из CSV</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="card-title h5">Загрузка файла с данными о задолженностях</h2>
+            </div>
+            <div class="card-body">
+                <p>Загрузите CSV-файл с данными о задолженностях. Файл должен содержать следующие столбцы:</p>
+                <ul>
+                    <li><strong>ФИО ученика</strong> - полное имя ученика</li>
+                    <li><strong>Предмет</strong> - название предмета</li>
+                    <li><strong>Период промежуточной аттестации</strong> - тема или период</li>
+                    <li><strong>Дата промежуточной аттестации</strong> - дата или диапазон дат</li>
+                    <li><strong>Итоговая отметка</strong> - оценка</li>
+                </ul>
+                
+                <form id="importDebtsForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csvFile" class="form-label">Выберите CSV-файл</label>
+                        <input type="file" class="form-control" id="csvFile" name="file" accept=".csv" required>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="templateType" class="form-label">Тип уведомления</label>
+                            <select class="form-select" id="templateType" name="template_type_id" required>
+                                <option value="">Выберите тип уведомления</option>
+                                {% for template_type in template_types %}
+                                <option value="{{ template_type.id }}" data-description="{{ template_type.description }}">{{ template_type.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text" id="templateDescription"></div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="period" class="form-label">Период</label>
+                            <input type="text" class="form-control" id="period" name="period" placeholder="например: 2-й модуль" required>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">Импортировать и создать уведомления</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div id="resultSection" class="card mb-4 d-none">
+            <div class="card-header">
+                <h2 class="card-title h5">Результаты импорта</h2>
+            </div>
+            <div class="card-body">
+                <div id="resultMessage"></div>
+                
+                <div id="failedStudentsSection" class="mt-3 d-none">
+                    <h3 class="h6">Список учеников, для которых не удалось создать уведомления:</h3>
+                    <ul id="failedStudentsList" class="list-group">
+                        <!-- Здесь будет список проблемных учеников -->
+                    </ul>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="/create_notification" class="btn btn-primary">Создать уведомление вручную</a>
+                    <button type="button" class="btn btn-secondary" onclick="location.reload()">Импортировать еще</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast уведомления -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
+        <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto" id="toastTitle">Уведомление</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                Текст уведомления
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-light py-3 mt-4">
+        <div class="container">
+            <p class="text-center text-muted">© 2025 Система уведомлений об академической задолженности</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Обработка изменения типа шаблона
+            const templateSelect = document.getElementById('templateType');
+            const templateDescription = document.getElementById('templateDescription');
+            
+            templateSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                templateDescription.textContent = selectedOption.dataset.description || '';
+            });
+            
+            // Обработка отправки формы
+            const importForm = document.getElementById('importDebtsForm');
+            const resultSection = document.getElementById('resultSection');
+            const resultMessage = document.getElementById('resultMessage');
+            const failedStudentsSection = document.getElementById('failedStudentsSection');
+            const failedStudentsList = document.getElementById('failedStudentsList');
+            
+            importForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(importForm);
+                
+                // Показываем индикатор загрузки
+                importForm.querySelector('button[type="submit"]').innerHTML = 
+                    '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Импортирую...';
+                importForm.querySelector('button[type="submit"]').disabled = true;
+                
+                fetch('/import_debts_csv', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Возвращаем кнопку в исходное состояние
+                    importForm.querySelector('button[type="submit"]').innerHTML = 'Импортировать и создать уведомления';
+                    importForm.querySelector('button[type="submit"]').disabled = false;
+                    
+                    if (data.success) {
+                        // Скрываем форму и показываем результаты
+                        importForm.closest('.card').classList.add('d-none');
+                        resultSection.classList.remove('d-none');
+                        
+                        // Выводим сообщение об успехе
+                        resultMessage.innerHTML = `<div class="alert alert-success">
+                            <p><strong>Импорт завершен успешно!</strong></p>
+                            <p>${data.message}</p>
+                        </div>`;
+                        
+                        // Если есть ученики, для которых не удалось создать уведомления
+                        if (data.details && data.details.failed > 0 && data.details.failed_students.length > 0) {
+                            failedStudentsSection.classList.remove('d-none');
+                            failedStudentsList.innerHTML = '';
+                            
+                            data.details.failed_students.forEach(student => {
+                                const listItem = document.createElement('li');
+                                listItem.className = 'list-group-item';
+                                listItem.innerHTML = `<strong>${student.name}</strong>: ${student.reason}`;
+                                failedStudentsList.appendChild(listItem);
+                            });
+                        } else {
+                            failedStudentsSection.classList.add('d-none');
+                        }
+                        
+                        showToast('Успешно', data.message, 'success');
+                    } else {
+                        showToast('Ошибка', data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    // Возвращаем кнопку в исходное состояние
+                    importForm.querySelector('button[type="submit"]').innerHTML = 'Импортировать и создать уведомления';
+                    importForm.querySelector('button[type="submit"]').disabled = false;
+                    
+                    showToast('Ошибка', 'Произошла ошибка при выполнении запроса', 'error');
+                });
+            });
+        });
+        
+        // Функция для отображения toast-уведомлений
+        function showToast(title, message, type) {
+            const toast = document.getElementById('toast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            
+            // Устанавливаем класс в зависимости от типа уведомления
+            toast.classList.remove('bg-success', 'bg-danger');
+            
+            if (type === 'success') {
+                toast.classList.add('bg-success', 'text-white');
+            } else if (type === 'error') {
+                toast.classList.add('bg-danger', 'text-white');
+            }
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+    </script>
+</body>
+</html>

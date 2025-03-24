@@ -1,0 +1,61 @@
+# Виртуальное окружение
+venv/
+env/
+ENV/
+.env
+
+# База данных SQLite
+*.db
+*.sqlite3
+*.sqlite
+
+# Сгенерированные документы
+generated_documents/
+
+# Загруженные файлы
+uploads/
+
+# Временные файлы
+temp/
+tmp/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+
+# Дистрибутивы и сборки
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Логи
+*.log
+logs/
+
+# Среды разработки
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Резервные копии файлов
+*~
+*.bak
+*.tmp
