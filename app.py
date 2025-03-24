@@ -215,14 +215,16 @@ def api_get_unique_classes():
     """API для получения списка всех классов"""
     from database.db import get_unique_classes_sorted
     unique_classes = get_unique_classes_sorted()
+    print(f"Запрошены классы, найдено: {unique_classes}")  # Для отладки
     return jsonify(unique_classes)
-
 @app.route('/api/get_students_by_class/<class_name>')
 def api_get_students_by_class(class_name):
     """API для получения списка учеников определенного класса"""
-    from database.db import get_students_by_class_sorted
-    students = get_students_by_class_sorted(class_name)
+    session = get_session()
+    students = session.query(Student).filter_by(class_name=class_name).all()
     result = [{'id': s.id, 'full_name': s.full_name, 'class_name': s.class_name} for s in students]
+    session.close()
+    print(f"Найдено {len(result)} учеников в классе {class_name}")  # Для отладки
     return jsonify(result)
 
 @app.route('/students')
@@ -249,4 +251,4 @@ def api_get_subjects_by_grade(grade):
     return jsonify([])
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)  # Изменить порт на 5001 или любой другой
+    app.run(debug=True, port=5000)  # Изменить порт на 5001 или любой другой

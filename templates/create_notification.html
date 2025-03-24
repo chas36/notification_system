@@ -173,52 +173,174 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Получаем параметры URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const preselectedStudentId = urlParams.get('student_id');
-            
-            // Инициализация списка классов
-            loadClasses();
-            
-            // Обработка изменения типа шаблона
-            const templateSelect = document.getElementById('templateType');
-            const templateDescription = document.getElementById('templateDescription');
-            
-            templateSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                templateDescription.textContent = selectedOption.dataset.description || '';
-                
-                // Проверка, нужно ли показывать раздел с датами ликвидации
-                const templateId = this.value;
-                const deadlinesSection = document.getElementById('deadlinesSection');
-                
-                // Показываем раздел для всех типов уведомлений, кроме предупреждений
-                if (templateId && templateId != 4) { // Предполагаем, что ID 4 соответствует "Предупреждение об отчислении"
-                    deadlinesSection.classList.remove('d-none');
-                } else {
-                    deadlinesSection.classList.add('d-none');
-                }
-            });
-            loadScheduleTimes();
-        
-        // Обработчик изменения класса студента
-        const studentSelect = document.getElementById('studentSelect');
-        studentSelect.addEventListener('change', function() {
-            // Если выбран студент, загружаем предметы для его класса
-            if (this.value) {
-                const studentOption = this.options[this.selectedIndex];
-                const studentClassName = studentOption.dataset.className || '';
-                
-                // Извлекаем номер класса (параллель)
-                const gradeMatch = studentClassName.match(/^(\d+)/);
-                if (gradeMatch && gradeMatch[1]) {
-                    loadSubjectsByGrade(gradeMatch[1]);
-                }
-            }
-        });
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    // Загружаем список классов при загрузке страницы
+    loadClasses();
     
+    // Обработчик изменения класса
+    const classSelect = document.getElementById('classSelect');
+    if (classSelect) {
+        classSelect.addEventListener('change', function() {
+            const className = this.value;
+            
+            // Очищаем и отключаем список учеников, если класс не выбран
+            const studentSelect = document.getElementById('studentSelect');
+            studentSelect.innerHTML = '';
+            
+            if (!className) {
+                studentSelect.disabled = true;
+                studentSelect.innerHTML = '<option value="">Сначала выберите класс</option>';
+                return;
+            }
+            
+            // Включаем список и загружаем учеников данного класса
+            studentSelect.disabled = false;
+            loadStudentsByClass(className);
+        });
+    }
+    
+    // Проверяем, был ли передан ID ученика в URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselectedStudentId = urlParams.get('student_id');
+    if (preselectedStudentId) {
+        loadStudentDetails(preselectedStudentId);
+    }
+});
+
+// Функция загрузки списка классов
+function loadClasses() {
+    console.log('Загрузка списка классов...');
+    fetch('/api/get_unique_classes')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(classes => {
+            console.log('Получены классы:', classes);
+            const classSelect = document.getElementById('classSelect');
+            
+            // Очищаем текущие варианты, кроме placeholder
+            classSelect.innerHTML = '<option value="">Выберите класс</option>';
+            
+            if (classes && classes.length > 0) {
+                // Добавляем классы в том порядке, в котором их вернул сервер
+                classes.forEach(className => {
+                    const option = document.createElement('option');
+                    option.value = className;
+                    option.textContent = className;
+                    classSelect.appendChild(option);
+                });
+            } else {
+                console.log('Нет доступных классов');
+                // Если классов нет, добавляем сообщение
+                const option = document.createElement('option');
+                option.disabled = true;
+                option.textContent = 'Нет доступных классов';
+                classSelect.appendChild(option);
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке классов:', error);
+            showToast('Ошибка', 'Не удалось загрузить список классов: ' + error.message, 'error');
+        });
+}
+
+// Функция загрузки учеников по классу
+function loadStudentsByClass(className) {
+    console.log('Загрузка учеников для класса:', className);
+    fetch(`/api/get_students_by_class/${encodeURIComponent(className)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(students => {
+            console.log('Получены ученики:', students);
+            const studentSelect = document.getElementById('studentSelect');
+            
+            // Очищаем список
+            studentSelect.innerHTML = '';
+            
+            if (students.length === 0) {
+                console.log('Нет учеников в классе', className);
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Нет учеников в этом классе';
+                studentSelect.appendChild(option);
+            } else {
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'Выберите ученика';
+                studentSelect.appendChild(defaultOption);
+                
+                students.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.id;
+                    option.textContent = student.full_name;
+                    option.dataset.className = student.class_name;
+                    studentSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке учеников:', error);
+            showToast('Ошибка', 'Не удалось загрузить список учеников: ' + error.message, 'error');
+        });
+}
+
+// Функция загрузки данных ученика по ID
+function loadStudentDetails(studentId) {
+    console.log('Загрузка данных ученика по ID:', studentId);
+    fetch(`/api/get_students`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(students => {
+            const student = students.find(s => s.id == studentId);
+            
+            if (student) {
+                console.log('Найден ученик:', student);
+                // Выбираем класс
+                const classSelect = document.getElementById('classSelect');
+                for (let i = 0; i < classSelect.options.length; i++) {
+                    if (classSelect.options[i].value === student.class_name) {
+                        classSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+                
+                // Загружаем список учеников класса
+                loadStudentsByClass(student.class_name);
+                
+                // После загрузки списка учеников, выбираем нужного ученика
+// После загрузки списка учеников, выбираем нужного ученика
+setTimeout(() => {
+    const studentSelect = document.getElementById('studentSelect');
+    studentSelect.disabled = false;
+    
+    for (let i = 0; i < studentSelect.options.length; i++) {
+        if (studentSelect.options[i].value == studentId) {
+        if (studentSelect.options[i].value == studentId) {
+            studentSelect.selectedIndex = i;
+            break;
+        }
+    }
+}, 500); // Даем время на загрузку списка учеников
+            } else {
+                console.log('Ученик не найден, ID:', studentId);
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке данных ученика:', error);
+            showToast('Ошибка', 'Не удалось загрузить данные ученика: ' + error.message, 'error');
+        });
+}
     // Функция для загрузки расписания звонков
     function loadScheduleTimes() {
         fetch('/api/get_schedule_times')
@@ -316,29 +438,29 @@
                 timeSelect.appendChild(option);
             });
             
-            // Обработчик изменения выбора урока
-            timeSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const dateInput = document.getElementById(`date_${subjectId.replace(/\s+/g, '_')}`);
-                
-                if (dateInput && selectedOption.dataset.start) {
-                    // Обновляем скрытое поле с временем начала урока
-                    const timeInput = document.getElementById(`time_${subjectId.replace(/\s+/g, '_')}`);
-                    if (timeInput) {
-                        timeInput.value = selectedOption.dataset.start;
-                    }
-                }
-            });
-            
-            timeCell.appendChild(timeSelect);
-            row.appendChild(timeCell);
-            
-            // Скрытое поле для хранения времени
-            const timeInput = document.createElement('input');
-            timeInput.type = 'hidden';
-            timeInput.id = `time_${subjectId.replace(/\s+/g, '_')}`;
-            timeInput.name = `time_${subjectId.replace(/\s+/g, '_')}`;
-            row.appendChild(timeInput);
+// Обработчик изменения выбора урока
+timeSelect.addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const dateInput = document.getElementById(`date_${subjectId.replace(/\s+/g, '_')}`);
+    
+    if (dateInput && selectedOption.dataset.start) {
+        // Обновляем скрытое поле с временем начала урока
+        const timeInputField = document.getElementById(`time_${subjectId.replace(/\s+/g, '_')}`);
+        if (timeInputField) {
+            timeInputField.value = selectedOption.dataset.start;
+        }
+    }
+});
+
+timeCell.appendChild(timeSelect);
+row.appendChild(timeCell);
+
+// Скрытое поле для хранения времени
+const timeInputElement = document.createElement('input');
+timeInputElement.type = 'hidden';
+timeInputElement.id = `time_${subjectId.replace(/\s+/g, '_')}`;
+timeInputElement.name = `time_${subjectId.replace(/\s+/g, '_')}`;
+row.appendChild(timeInputElement);
             
             // Ячейка с датой
             const dateCell = document.createElement('td');
