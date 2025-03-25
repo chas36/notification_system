@@ -80,48 +80,157 @@ def create_notification_page():
                            subjects=subjects, 
                            template_types=template_types)
 
+# Обновленный обработчик запроса для app.py
+
 @app.route('/submit_notification', methods=['POST'])
 def submit_notification():
     """Обработка формы создания уведомления"""
-    student_id = request.form.get('student_id')
-    template_type_id = request.form.get('template_type_id')
-    period = request.form.get('period')
-    subjects = request.form.getlist('subjects[]')
-    
-    # Проверяем обязательные поля
-    if not student_id or not template_type_id or not period or not subjects:
-        return jsonify({'success': False, 'message': 'Заполните все обязательные поля'})
-    
-    # Получаем ID предметов или создаем новые
-    from database.db import get_subject_by_name
-    subject_ids = [get_subject_by_name(subject) for subject in subjects]
-    
-    # Собираем информацию о сроках ликвидации задолженностей
-    deadlines = []
-    for subject in subjects:
-        subject_key = subject.replace(' ', '_')
-        date = request.form.get(f'date_{subject_key}')
-        time = request.form.get(f'time_{subject_key}')
-        topic = request.form.get(f'topic_{subject_key}')
-        lesson_id = request.form.get(f'lesson_{subject_key}')
-        
-        if date and lesson_id:  # Добавляем только если указаны дата и урок
-            from database.db import get_schedule_times
-            schedule_times = get_schedule_times()
-            lesson_time = next((t['start'] for t in schedule_times if str(t['id']) == lesson_id), None)
-            
-            subject_id = get_subject_by_name(subject)
-            deadlines.append({
-                'subject_id': subject_id,
-                'date': date,
-                'time': lesson_time or time,
-                'topic': topic
-            })
-    
-    # Создаем уведомление
     try:
-        from database.db import create_notification
-        notification_id = create_notification(student_id, template_type_id, period, subject_ids, deadlines)
+        # Получаем основные данные
+        student_id = request.form.get('student_id')
+        template_type_id = request.form.get('template_type_id')
+        period = request.form.get('period')
+        
+        # Проверяем обязательные поля
+        if not student_id or not template_type_id or not period:
+            return jsonify({'success': False, 'message': 'Заполните все обязательные поля'})
+        
+        # Получаем данные о выбранных предметах
+        failed_subjects = request.form.getlist('failed_subjects[]')
+        satisfactory_subjects = request.form.getlist('satisfactory_subjects[]')
+        
+        if not failed_subjects and not satisfactory_subjects:
+            return jsonify({'success': False, 'message': 'Выберите хотя бы один предмет'})
+        
+        # Получаем ID предметов
+        from database.db import get_subject_by_name
+        failed_subject_ids = [get_subject_by_name(subject) for subject in failed_subjects]
+        satisfactory_subject_ids = [get_subject_by_name(subject) for subject in satisfactory_subjects]
+        
+        # Все предметы для уведомления
+        all_subject_ids = failed_subject_ids + satisfactory_subject_ids
+        
+        # Получаем информацию о дедлайне
+        need_deadline = request.form.get('need_deadline') == 'on'
+        deadline_date = request.form.get('deadline_date')
+        
+        # Создаем запись уведомления в БД
+        from database.db import create_notification, get_student_by_id
+        notification_id = create_notification(
+            student_id=student_id,
+            template_type_id=template_type_id,
+            period=period,
+            subjects_ids=all_subject_ids
+        )
+        
+        # Сохраняем дополнительные данные для генерации документа
+        from database.models import NotificationMeta, NotificationConsultation
+        from database.db import get_session
+        
+        session = get_session()
+        
+        # Сохраняем информацию о разделении предметов
+        meta = NotificationMeta(
+            notification_id=notification_id,
+            key='failed_subjects',
+            value=','.join(failed_subjects)
+        )
+        session.add(meta)
+        
+        if satisfactory_subjects:
+            meta = NotificationMeta(
+                notification_id=notification_id,
+                key='satisfactory_subjects',
+                value=','.join(satisfactory_subjects)
+            )
+            session.add(meta)
+        
+        # Сохраняем дату дедлайна, если указана
+        if need_deadline and deadline_date:
+            meta = NotificationMeta(
+                notification_id=notification_id,
+                key='deadline_date',
+                value=deadline_date
+            )
+            session.add(meta)
+        
+        # Проверяем, нужно ли добавлять график консультаций
+        need_consultations = request.form.get('need_consultations') == 'on'
+        
+        if need_consultations:
+            # Обрабатываем консультации для предметов с задолженностями
+            for subject in failed_subjects:
+                subject_key = subject.replace(' ', '_')
+                topics_count_key = f'failed_topics_count_{subject_key}'
+                topics_count = int(request.form.get(topics_count_key, 1))
+                
+                for i in range(1, topics_count + 1):
+                    prefix = f'failed_consultations_{subject_key}_topic_{i}'
+                    
+                    # Получаем данные консультации
+                    topic_name = request.form.get(f'{prefix}_name', '')
+                    date = request.form.get(f'{prefix}_date', '')
+                    lesson_id = request.form.get(f'{prefix}_lesson', '')
+                    
+                    if date and lesson_id:
+                        # Получаем время урока
+                        from database.db import get_schedule_times
+                        schedule_times = get_schedule_times()
+                        lesson_info = next((t for t in schedule_times if str(t['id']) == lesson_id), None)
+                        
+                        if lesson_info:
+                            time = lesson_info['start']
+                            
+                            # Сохраняем консультацию
+                            subject_id = get_subject_by_name(subject)
+                            consultation = NotificationConsultation(
+                                notification_id=notification_id,
+                                subject_id=subject_id,
+                                topic_name=topic_name,
+                                date=date,
+                                time=time,
+                                topic_type='failed'  # Тип "задолженность"
+                            )
+                            session.add(consultation)
+            
+            # Обрабатываем консультации для предметов с удовлетворительными оценками
+            for subject in satisfactory_subjects:
+                subject_key = subject.replace(' ', '_')
+                topics_count_key = f'satisfactory_topics_count_{subject_key}'
+                topics_count = int(request.form.get(topics_count_key, 1))
+                
+                for i in range(1, topics_count + 1):
+                    prefix = f'satisfactory_consultations_{subject_key}_topic_{i}'
+                    
+                    # Получаем данные консультации
+                    topic_name = request.form.get(f'{prefix}_name', '')
+                    date = request.form.get(f'{prefix}_date', '')
+                    lesson_id = request.form.get(f'{prefix}_lesson', '')
+                    
+                    if date and lesson_id:
+                        # Получаем время урока
+                        from database.db import get_schedule_times
+                        schedule_times = get_schedule_times()
+                        lesson_info = next((t for t in schedule_times if str(t['id']) == lesson_id), None)
+                        
+                        if lesson_info:
+                            time = lesson_info['start']
+                            
+                            # Сохраняем консультацию
+                            subject_id = get_subject_by_name(subject)
+                            consultation = NotificationConsultation(
+                                notification_id=notification_id,
+                                subject_id=subject_id,
+                                topic_name=topic_name,
+                                date=date,
+                                time=time,
+                                topic_type='satisfactory'  # Тип "удовлетворительно"
+                            )
+                            session.add(consultation)
+        
+        # Сохраняем все изменения
+        session.commit()
+        session.close()
         
         # Генерируем документ
         from utils.document_generator import generate_document
@@ -146,7 +255,7 @@ def submit_notification():
             'success': False, 
             'message': f'Ошибка при создании уведомления: {str(e)}'
         })
-    
+
 @app.route('/download_document/<path:filename>')
 def download_document(filename):
     """Скачивание сгенерированного документа"""
@@ -220,6 +329,7 @@ def api_get_unique_classes():
 @app.route('/api/get_students_by_class/<class_name>')
 def api_get_students_by_class(class_name):
     """API для получения списка учеников определенного класса"""
+    from database.db import get_session, Student
     session = get_session()
     students = session.query(Student).filter_by(class_name=class_name).all()
     result = [{'id': s.id, 'full_name': s.full_name, 'class_name': s.class_name} for s in students]

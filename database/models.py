@@ -84,3 +84,37 @@ class DeadlineDate(Base):
     
     def __repr__(self):
         return f"<DeadlineDate(notification_id={self.notification_id}, subject_id={self.subject_id}, date='{self.date}')>"
+    
+# Добавление новых моделей в database/models.py
+
+# Добавьте эти модели в конец файла database/models.py
+
+class NotificationMeta(Base):
+    __tablename__ = 'notification_meta'
+    
+    id = Column(Integer, primary_key=True)
+    notification_id = Column(Integer, ForeignKey('notifications.id'), nullable=False)
+    key = Column(String, nullable=False)
+    value = Column(String)
+    
+    notification = relationship("Notification")
+    
+    def __repr__(self):
+        return f"<NotificationMeta(notification_id={self.notification_id}, key='{self.key}')>"
+
+class NotificationConsultation(Base):
+    __tablename__ = 'notification_consultations'
+    
+    id = Column(Integer, primary_key=True)
+    notification_id = Column(Integer, ForeignKey('notifications.id'), nullable=False)
+    subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=False)
+    topic_name = Column(String)
+    date = Column(String, nullable=False)
+    time = Column(String)
+    topic_type = Column(String, default='failed')  # 'failed' или 'satisfactory'
+    
+    notification = relationship("Notification")
+    subject = relationship("Subject")
+    
+    def __repr__(self):
+        return f"<NotificationConsultation(notification_id={self.notification_id}, subject_id={self.subject_id}, date='{self.date}')>"

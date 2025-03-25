@@ -1,10 +1,10 @@
-"""
-Модуль обновления document_generator.py для работы с новым шаблоном уведомлений
-"""
+# utils/document_generator.py
+
 from docx import Document
 import os
 from datetime import datetime
-from database.db import get_notification_with_details
+from database.db import get_notification_with_details, get_session
+from database.models import NotificationMeta, NotificationConsultation
 
 def generate_document(notification_id):
     """Генерирует документ уведомления на основе данных из БД и нового шаблона"""
@@ -27,7 +27,30 @@ def generate_document(notification_id):
         # Получаем данные для подстановки
         student = notification_data['student']
         subjects = notification_data['subjects']
-        deadline_dates = notification_data['deadlines']
+        
+        # Получаем дополнительные метаданные
+        session = get_session()
+        meta_records = session.query(NotificationMeta).filter_by(notification_id=notification_id).all()
+        meta = {item.key: item.value for item in meta_records}
+        
+        # Получаем консультации
+        consultations = session.query(NotificationConsultation).filter_by(notification_id=notification_id).all()
+        session.close()
+        
+        # Определяем типы предметов
+        failed_subjects = []
+        satisfactory_subjects = []
+        
+        if 'failed_subjects' in meta:
+            failed_subject_names = meta['failed_subjects'].split(',')
+            failed_subjects = [s for s in subjects if s.name in failed_subject_names]
+        else:
+            # Если нет метаданных, все предметы считаем с задолженностями
+            failed_subjects = subjects
+        
+        if 'satisfactory_subjects' in meta:
+            satisfactory_subject_names = meta['satisfactory_subjects'].split(',')
+            satisfactory_subjects = [s for s in subjects if s.name in satisfactory_subject_names]
         
         # Определяем, является ли класс "A" классом
         is_class_a = "А" in student.class_name or "A" in student.class_name
@@ -39,8 +62,12 @@ def generate_document(notification_id):
         main_text_found = False
         for i, paragraph in enumerate(doc.paragraphs):
             if "Уведомление" in paragraph.text:
-                # Вставляем основной текст после заголовка "Уведомление"
-                p = doc.add_paragraph(notification_text)
+                # Если нашли заголовок, добавляем текст после него
+                insertion_index = i + 1
+                if insertion_index < len(doc.paragraphs):
+                    doc.paragraphs[insertion_index].text = notification_text
+                else:
+                    doc.add_paragraph(notification_text)
                 main_text_found = True
                 break
         
@@ -50,48 +77,59 @@ def generate_document(notification_id):
             doc.add_paragraph(notification_text)
         
         # Добавляем список предметов с неудовлетворительными оценками
-        if subjects:
-            # Получаем список предметов с неудовлетворительными оценками
-            failed_subjects = [subject.name for subject in subjects]
-            failed_subjects_text = ", ".join(failed_subjects)
-            
+        if failed_subjects:
+            failed_subjects_text = ", ".join([s.name for s in failed_subjects])
             doc.add_paragraph(f"- неудовлетворительные отметки по предметам: {failed_subjects_text}")
-            
-            # Для классов, кроме "А", также добавляем удовлетворительные оценки по углубленным предметам
-            if not is_class_a:
-                # В реальном приложении здесь должна быть логика определения предметов с оценкой "3"
-                # Это заглушка, которую нужно заменить реальными данными
-                satisfactory_subjects = []  # Это нужно заполнить из базы данных
-                
-                if satisfactory_subjects:
-                    satisfactory_subjects_text = ", ".join(satisfactory_subjects)
-                    doc.add_paragraph(f"- удовлетворительные отметки по предметам, изучаемым на углубленном уровне: {satisfactory_subjects_text}")
+        
+        # Для классов, кроме "А", также добавляем удовлетворительные оценки по углубленным предметам
+        if not is_class_a and satisfactory_subjects:
+            satisfactory_subjects_text = ", ".join([s.name for s in satisfactory_subjects])
+            doc.add_paragraph(f"- удовлетворительные отметки по предметам, изучаемым на углубленном уровне: {satisfactory_subjects_text}")
         
         # Добавляем информацию о возможном переводе (для всех классов, кроме "А")
-        if not is_class_a:
-            deadline_date = notification_data.get('deadline_date', 'указанного срока')
+        if not is_class_a and 'deadline_date' in meta:
+            deadline_date = meta['deadline_date']
             doc.add_paragraph(f"В случае, если данные оценки не будут исправлены до {deadline_date}, то по решению Педагогического совета в соответствии с положением школы о классах с углубленным изучением отдельных предметов может быть осуществлен перевод в общеобразовательный класс.")
         
         # Добавляем график ликвидации задолженностей, если он есть
-        if deadline_dates:
+        if consultations:
             doc.add_paragraph("График ликвидации академической задолженности:")
             
             # Создаем таблицу для графика
-            table = doc.add_table(rows=1, cols=3)
+            table = doc.add_table(rows=1, cols=4)
             table.style = 'Table Grid'
             
             # Заголовки таблицы
             hdr_cells = table.rows[0].cells
             hdr_cells[0].text = "Предмет"
-            hdr_cells[1].text = "Дата"
-            hdr_cells[2].text = "Тема (при наличии)"
+            hdr_cells[1].text = "Тема"
+            hdr_cells[2].text = "Дата"
+            hdr_cells[3].text = "Время"
+            
+            # Группируем консультации по предметам и типам
+            consultations_by_subject = {}
+            
+            for consultation in consultations:
+                subject_name = consultation.subject.name
+                if subject_name not in consultations_by_subject:
+                    consultations_by_subject[subject_name] = []
+                
+                consultations_by_subject[subject_name].append(consultation)
             
             # Добавляем строки для каждого предмета
-            for deadline in deadline_dates:
-                row_cells = table.add_row().cells
-                row_cells[0].text = deadline['subject'].name
-                row_cells[1].text = deadline['date']
-                row_cells[2].text = deadline.get('topic', '')
+            for subject_name, subject_consultations in consultations_by_subject.items():
+                for i, consultation in enumerate(subject_consultations):
+                    row_cells = table.add_row().cells
+                    
+                    # Для первой консультации предмета указываем название предмета
+                    if i == 0:
+                        row_cells[0].text = subject_name
+                    else:
+                        row_cells[0].text = ""
+                    
+                    row_cells[1].text = consultation.topic_name
+                    row_cells[2].text = consultation.date
+                    row_cells[3].text = consultation.time
         
         # Определяем учебный год
         now = datetime.now()
@@ -102,8 +140,8 @@ def generate_document(notification_id):
         
         # Заменяем плейсхолдер для учебного года, если он есть
         for paragraph in doc.paragraphs:
-            if "учебного года" in paragraph.text:
-                paragraph.text = paragraph.text.replace("учебного года", f"учебного года {academic_year}")
+            if "2023-2024" in paragraph.text:
+                paragraph.text = paragraph.text.replace("2023-2024", academic_year)
         
         # Создаем директорию для сохранения результатов, если её нет
         output_dir = 'generated_documents'
@@ -124,4 +162,6 @@ def generate_document(notification_id):
         }
     
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {'success': False, 'message': f'Ошибка при генерации документа: {str(e)}'}

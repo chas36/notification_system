@@ -1,3 +1,5 @@
+
+<!-- templates/create_notification.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -40,96 +42,132 @@
         <div class="card mb-4">
             <div class="card-body">
                 <form id="notificationForm">
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label for="templateType" class="form-label">Тип уведомления</label>
-                            <select class="form-select" id="templateType" name="template_type_id" required>
-                                <option value="">Выберите тип уведомления</option>
-                                {% for template_type in template_types %}
-                                <option value="{{ template_type.id }}" data-description="{{ template_type.description }}">{{ template_type.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <div class="form-text" id="templateDescription"></div>
+                    <!-- Шаг 1: Выбор основной информации -->
+                    <div id="step1" class="form-step">
+                        <h4 class="mb-3">Шаг 1: Основная информация</h4>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="templateType" class="form-label">Тип уведомления</label>
+                                <select class="form-select" id="templateType" name="template_type_id" required>
+                                    <option value="">Выберите тип уведомления</option>
+                                    {% for template_type in template_types %}
+                                    <option value="{{ template_type.id }}" data-description="{{ template_type.description }}">{{ template_type.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text" id="templateDescription"></div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="periodType" class="form-label">Период</label>
+                                <select class="form-select" id="periodType" name="period_type" required>
+                                    <option value="">Выберите тип периода</option>
+                                    <option value="module">Модуль</option>
+                                    <option value="trimester">Триместр</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="period" class="form-label">Номер периода</label>
+                                <select class="form-select" id="period" name="period" required disabled>
+                                    <option value="">Сначала выберите тип периода</option>
+                                </select>
+                            </div>
                         </div>
                         
-                        <div class="col-md-4">
-                            <label for="periodType" class="form-label">Период</label>
-                            <select class="form-select" id="periodType" name="period_type" required>
-                                <option value="">Выберите тип периода</option>
-                                <option value="module">Модуль</option>
-                                <option value="trimester">Триместр</option>
-                            </select>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="classSelect" class="form-label">Класс</label>
+                                <select class="form-select" id="classSelect" required>
+                                    <option value="">Выберите класс</option>
+                                    <!-- Список классов будет загружен через JavaScript -->
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-8">
+                                <label for="studentSelect" class="form-label">Ученик</label>
+                                <select class="form-select" id="studentSelect" name="student_id" required disabled>
+                                    <option value="">Сначала выберите класс</option>
+                                </select>
+                            </div>
                         </div>
                         
-                        <div class="col-md-4">
-                            <label for="period" class="form-label">Номер периода</label>
-                            <select class="form-select" id="period" name="period" required disabled>
-                                <option value="">Сначала выберите тип периода</option>
-                            </select>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" class="btn btn-primary" id="goToStep2">Продолжить</button>
                         </div>
                     </div>
                     
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label for="classSelect" class="form-label">Класс</label>
-                            <select class="form-select" id="classSelect" required>
-                                <option value="">Выберите класс</option>
-                                <!-- Список классов будет загружен через JavaScript -->
-                            </select>
-                        </div>
+                    <!-- Шаг 2: Выбор предметов и детализация -->
+                    <div id="step2" class="form-step d-none">
+                        <h4 class="mb-3">Шаг 2: Выбор предметов с задолженностями</h4>
                         
-                        <div class="col-md-8">
-                            <label for="studentSelect" class="form-label">Ученик</label>
-                            <select class="form-select" id="studentSelect" name="student_id" required disabled>
-                                <option value="">Сначала выберите класс</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <label class="form-label">Предметы с задолженностями</label>
-                            <div class="card">
-                                <div class="card-body">
-                                    <div class="row">
-                                        {% for subject in subjects %}
-                                        <div class="col-md-4 mb-2">
-                                            <div class="form-check">
-                                                <input class="form-check-input subject-checkbox" type="checkbox" value="{{ subject.id }}" id="subject{{ subject.id }}" name="subjects[]">
-                                                <label class="form-check-label" for="subject{{ subject.id }}">
-                                                    {{ subject.name }}
-                                                </label>
-                                            </div>
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label class="form-label">Предметы с академическими задолженностями</label>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div id="failedSubjectsContainer" class="row">
+                                            <!-- Здесь будут предметы с задолженностями (динамически из JS) -->
                                         </div>
-                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div id="deadlinesSection" class="mb-3 d-none">
-                        <label class="form-label">График ликвидации задолженностей</label>
-                        <div class="table-responsive">
-                            <table class="table table-bordered" id="deadlinesTable">
-                                <thead>
-                                    <tr>
-                                        <th>Предмет</th>
-                                        <th>Урок (время)</th>
-                                        <th>Дата</th>
-                                        <th>Тема</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Здесь будут добавляться строки для предметов с задолженностями -->
-                                </tbody>
-                            </table>
+                        
+                        <div id="satisfactorySubjectsSection" class="row mb-3 d-none">
+                            <div class="col-12">
+                                <label class="form-label">Углубленные предметы с оценкой "3" (удовлетворительно)</label>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div id="satisfactorySubjectsContainer" class="row">
+                                            <!-- Здесь будут предметы с оценкой "3" (динамически из JS) -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="needConsultationsSchedule" name="need_consultations">
+                                    <label class="form-check-label" for="needConsultationsSchedule">
+                                        Добавить график консультаций
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="needDeadline" name="need_deadline">
+                                    <label class="form-check-label" for="needDeadline">
+                                        Указать крайний срок ликвидации задолженностей
+                                    </label>
+                                </div>
+                                <div id="deadlineSection" class="mt-2 d-none">
+                                    <label for="deadlineDate" class="form-label">Крайний срок</label>
+                                    <input type="date" class="form-control" id="deadlineDate" name="deadline_date">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" class="btn btn-secondary" id="backToStep1">Назад</button>
+                            <button type="button" class="btn btn-primary" id="goToStep3">Продолжить</button>
                         </div>
                     </div>
                     
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <button type="button" class="btn btn-secondary" onclick="window.history.back()">Отмена</button>
-                        <button type="submit" class="btn btn-primary" id="createNotificationBtn">Создать уведомление</button>
+                    <!-- Шаг 3: График консультаций -->
+                    <div id="step3" class="form-step d-none">
+                        <h4 class="mb-3">Шаг 3: График консультаций</h4>
+                        
+                        <div id="consultationsScheduleSection">
+                            <!-- Здесь будет динамически созданная форма для графика консультаций -->
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" class="btn btn-secondary" id="backToStep2">Назад</button>
+                            <button type="submit" class="btn btn-success" id="createNotificationBtn">Создать уведомление</button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -172,527 +210,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Загружаем список классов при загрузке страницы
-    loadClasses();
-    
-    // Обработчик изменения класса
-    const classSelect = document.getElementById('classSelect');
-    if (classSelect) {
-        classSelect.addEventListener('change', function() {
-            const className = this.value;
-            
-            // Очищаем и отключаем список учеников, если класс не выбран
-            const studentSelect = document.getElementById('studentSelect');
-            studentSelect.innerHTML = '';
-            
-            if (!className) {
-                studentSelect.disabled = true;
-                studentSelect.innerHTML = '<option value="">Сначала выберите класс</option>';
-                return;
-            }
-            
-            // Включаем список и загружаем учеников данного класса
-            studentSelect.disabled = false;
-            loadStudentsByClass(className);
-        });
-    }
-    
-    // Проверяем, был ли передан ID ученика в URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const preselectedStudentId = urlParams.get('student_id');
-    if (preselectedStudentId) {
-        loadStudentDetails(preselectedStudentId);
-    }
-});
-
-
-
-// Функция загрузки данных ученика по ID
-function loadStudentDetails(studentId) {
-    console.log('Загрузка данных ученика по ID:', studentId);
-    fetch(`/api/get_students`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(students => {
-            const student = students.find(s => s.id == studentId);
-            
-            if (student) {
-                console.log('Найден ученик:', student);
-                // Выбираем класс
-                const classSelect = document.getElementById('classSelect');
-                for (let i = 0; i < classSelect.options.length; i++) {
-                    if (classSelect.options[i].value === student.class_name) {
-                        classSelect.selectedIndex = i;
-                        break;
-                    }
-                }
-                
-                // Загружаем список учеников класса
-                loadStudentsByClass(student.class_name);
-                
-                // После загрузки списка учеников, выбираем нужного ученика
-// После загрузки списка учеников, выбираем нужного ученика
-setTimeout(() => {
-    const studentSelect = document.getElementById('studentSelect');
-    studentSelect.disabled = false;
-    
-    for (let i = 0; i < studentSelect.options.length; i++) {
-        if (studentSelect.options[i].value == studentId) {
-            studentSelect.selectedIndex = i;
-            break;
-        }
-    }
-}, 500); // Даем время на загрузку списка учеников
-            } else {
-                console.log('Ученик не найден, ID:', studentId);
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка при загрузке данных ученика:', error);
-            showToast('Ошибка', 'Не удалось загрузить данные ученика: ' + error.message, 'error');
-        });
-}
-    // Функция для загрузки расписания звонков
-    function loadScheduleTimes() {
-        fetch('/api/get_schedule_times')
-            .then(response => response.json())
-            .then(times => {
-                window.scheduleTimes = times; // Сохраняем для использования в других функциях
-                
-                // Заполняем выпадающие списки времени, когда они создаются
-                updateDeadlinesTable();
-            })
-            .catch(error => {
-                showToast('Ошибка', 'Не удалось загрузить расписание звонков', 'error');
-            });
-    }
-    
-    // Функция для загрузки предметов по параллели
-    function loadSubjectsByGrade(grade) {
-        fetch(`/api/get_subjects_by_grade/${grade}`)
-            .then(response => response.json())
-            .then(subjects => {
-                // Обновляем список предметов
-                const subjectsContainer = document.querySelector('.card-body .row');
-                if (subjectsContainer) {
-                    subjectsContainer.innerHTML = '';
-                    
-                    subjects.forEach((subject, index) => {
-                        const col = document.createElement('div');
-                        col.className = 'col-md-4 mb-2';
-                        col.innerHTML = `
-                            <div class="form-check">
-                                <input class="form-check-input subject-checkbox" type="checkbox" value="${subject}" id="subject${index}" name="subjects[]">
-                                <label class="form-check-label" for="subject${index}">
-                                    ${subject}
-                                </label>
-                            </div>
-                        `;
-                        subjectsContainer.appendChild(col);
-                    });
-                    
-                    // Переприкрепляем обработчики событий для новых чекбоксов
-                    const subjectCheckboxes = document.querySelectorAll('.subject-checkbox');
-                    subjectCheckboxes.forEach(checkbox => {
-                        checkbox.addEventListener('change', updateDeadlinesTable);
-                    });
-                }
-            })
-            .catch(error => {
-                showToast('Ошибка', 'Не удалось загрузить список предметов', 'error');
-            });
-    }
-    
-    // Функция для обновления таблицы сроков ликвидации
-    function updateDeadlinesTable() {
-        const selectedSubjects = document.querySelectorAll('.subject-checkbox:checked');
-        const deadlinesTable = document.getElementById('deadlinesTable').querySelector('tbody');
-        
-        // Очищаем таблицу
-        deadlinesTable.innerHTML = '';
-        
-        // Если расписание звонков не загружено, выходим
-        if (!window.scheduleTimes) return;
-        
-        // Добавляем строки для выбранных предметов
-        selectedSubjects.forEach(checkbox => {
-            const subjectId = checkbox.value;
-            const subjectName = checkbox.nextElementSibling.textContent.trim();
-            
-            const row = document.createElement('tr');
-            
-            // Ячейка с названием предмета
-            const subjectCell = document.createElement('td');
-            subjectCell.textContent = subjectName;
-            row.appendChild(subjectCell);
-            
-            // Ячейка с выбором урока и времени
-            const timeCell = document.createElement('td');
-            const timeSelect = document.createElement('select');
-            timeSelect.className = 'form-select';
-            timeSelect.id = `lesson_${subjectId.replace(/\s+/g, '_')}`;
-            timeSelect.name = `lesson_${subjectId.replace(/\s+/g, '_')}`;
-            
-            // Добавляем пустую опцию
-            const emptyOption = document.createElement('option');
-            emptyOption.value = '';
-            emptyOption.textContent = 'Выберите урок';
-            timeSelect.appendChild(emptyOption);
-            
-            // Добавляем опции с уроками и временем
-            window.scheduleTimes.forEach(time => {
-                const option = document.createElement('option');
-                option.value = time.id;
-                option.textContent = `${time.name} (${time.start} - ${time.end})`;
-                option.dataset.start = time.start;
-                option.dataset.end = time.end;
-                timeSelect.appendChild(option);
-            });
-            
-// Обработчик изменения выбора урока
-timeSelect.addEventListener('change', function() {
-    const selectedOption = this.options[this.selectedIndex];
-    const dateInput = document.getElementById(`date_${subjectId.replace(/\s+/g, '_')}`);
-    
-    if (dateInput && selectedOption.dataset.start) {
-        // Обновляем скрытое поле с временем начала урока
-        const timeInputField = document.getElementById(`time_${subjectId.replace(/\s+/g, '_')}`);
-        if (timeInputField) {
-            timeInputField.value = selectedOption.dataset.start;
-        }
-    }
-});
-
-timeCell.appendChild(timeSelect);
-row.appendChild(timeCell);
-
-// Скрытое поле для хранения времени
-const timeInputElement = document.createElement('input');
-timeInputElement.type = 'hidden';
-timeInputElement.id = `time_${subjectId.replace(/\s+/g, '_')}`;
-timeInputElement.name = `time_${subjectId.replace(/\s+/g, '_')}`;
-row.appendChild(timeInputElement);
-            
-            // Ячейка с датой
-            const dateCell = document.createElement('td');
-            const dateInput = document.createElement('input');
-            dateInput.type = 'date';
-            dateInput.className = 'form-control';
-            dateInput.id = `date_${subjectId.replace(/\s+/g, '_')}`;
-            dateInput.name = `date_${subjectId.replace(/\s+/g, '_')}`;
-            dateCell.appendChild(dateInput);
-            row.appendChild(dateCell);
-            
-            // Ячейка с темой
-            const topicCell = document.createElement('td');
-            const topicInput = document.createElement('input');
-            topicInput.type = 'text';
-            topicInput.className = 'form-control';
-            topicInput.id = `topic_${subjectId.replace(/\s+/g, '_')}`;
-            topicInput.name = `topic_${subjectId.replace(/\s+/g, '_')}`;
-            topicInput.placeholder = 'Введите тему';
-            topicCell.appendChild(topicInput);
-            row.appendChild(topicCell);
-            
-            deadlinesTable.appendChild(row);
-        });
-            // Обработка изменения типа периода
-            const periodTypeSelect = document.getElementById('periodType');
-            const periodSelect = document.getElementById('period');
-            
-            periodTypeSelect.addEventListener('change', function() {
-                const type = this.value;
-                
-                // Очищаем и отключаем список периодов, если тип не выбран
-                periodSelect.innerHTML = '';
-                
-                if (!type) {
-                    periodSelect.disabled = true;
-                    periodSelect.innerHTML = '<option value="">Сначала выберите тип периода</option>';
-                    return;
-                }
-                
-                // Включаем список и заполняем его вариантами в зависимости от типа
-                periodSelect.disabled = false;
-                
-                if (type === 'module') {
-                    // Для модулей добавляем варианты от 1 до 5
-                    for (let i = 1; i <= 5; i++) {
-                        const option = document.createElement('option');
-                        option.value = i;
-                        option.textContent = `${i}-й модуль`;
-                        periodSelect.appendChild(option);
-                    }
-                } else if (type === 'trimester') {
-                    // Для триместров добавляем варианты от 1 до 3
-                    for (let i = 1; i <= 3; i++) {
-                        const option = document.createElement('option');
-                        option.value = i;
-                        option.textContent = `${i}-й триместр`;
-                        periodSelect.appendChild(option);
-                    }
-                }
-            });
-            
-            // Обработка изменения класса
-            const classSelect = document.getElementById('classSelect');
-            const studentSelect = document.getElementById('studentSelect');
-            
-           
-        
-            // Обработка изменения списка предметов
-            const subjectCheckboxes = document.querySelectorAll('.subject-checkbox');
-            
-            subjectCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', updateDeadlinesTable);
-            });
-            
-            // Обработка отправки формы
-            const notificationForm = document.getElementById('notificationForm');
-            
-            notificationForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // Проверяем, выбран ли хотя бы один предмет
-                const selectedSubjects = document.querySelectorAll('.subject-checkbox:checked');
-                if (selectedSubjects.length === 0) {
-                    showToast('Ошибка', 'Выберите хотя бы один предмет с задолженностью', 'error');
-                    return;
-                }
-                
-                // Собираем данные формы
-                const formData = new FormData(notificationForm);
-                
-                // Добавляем данные о датах ликвидации задолженностей
-                if (!document.getElementById('deadlinesSection').classList.contains('d-none')) {
-                    selectedSubjects.forEach(subjectCheckbox => {
-                        const subjectId = subjectCheckbox.value;
-                        const dateInput = document.getElementById(`date_${subjectId}`);
-                        const timeInput = document.getElementById(`time_${subjectId}`);
-                        const topicInput = document.getElementById(`topic_${subjectId}`);
-                        
-                        if (dateInput && dateInput.value) {
-                            formData.append(`date_${subjectId}`, dateInput.value);
-                            
-                            if (timeInput && timeInput.value) {
-                                formData.append(`time_${subjectId}`, timeInput.value);
-                            }
-                            
-                            if (topicInput && topicInput.value) {
-                                formData.append(`topic_${subjectId}`, topicInput.value);
-                            }
-                        }
-                    });
-                }
-                
-                // Отправляем данные на сервер
-                fetch('/submit_notification', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Скрываем форму и показываем результат
-                        notificationForm.parentElement.parentElement.classList.add('d-none');
-                        const resultSection = document.getElementById('resultSection');
-                        resultSection.classList.remove('d-none');
-                        
-                        // Настраиваем ссылку для скачивания
-                        const downloadLink = document.getElementById('downloadLink');
-                        downloadLink.href = `/download_document/${data.file_name}`;
-                        
-                        showToast('Успешно', 'Уведомление успешно создано', 'success');
-                    } else {
-                        showToast('Ошибка', data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    showToast('Ошибка', 'Произошла ошибка при выполнении запроса', 'error');
-                });
-            });
-            
-            // Если был передан ID ученика в URL, предварительно выбираем его
-            if (preselectedStudentId) {
-                loadStudentDetails(preselectedStudentId);
-            }
-        });
-        
-       // Функция загрузки списка классов
-function loadClasses() {
-    fetch('/api/get_unique_classes')
-        .then(response => response.json())
-        .then(classes => {
-            const classSelect = document.getElementById('classSelect');
-            
-            // Очищаем текущие варианты
-            classSelect.innerHTML = '<option value="">Выберите класс</option>';
-            
-            // Добавляем классы в том порядке, в котором их вернул сервер
-            classes.forEach(className => {
-                const option = document.createElement('option');
-                option.value = className;
-                option.textContent = className;
-                classSelect.appendChild(option);
-            });
-        })
-        .catch(error => {
-            showToast('Ошибка', 'Не удалось загрузить список классов', 'error');
-        });
-}
-        
-        // Функция загрузки учеников по классу
-function loadStudentsByClass(className) {
-    fetch(`/api/get_students_by_class/${encodeURIComponent(className)}`)
-        .then(response => response.json())
-        .then(students => {
-            const studentSelect = document.getElementById('studentSelect');
-            
-            // Очищаем список
-            studentSelect.innerHTML = '';
-            
-            if (students.length === 0) {
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = 'Нет учеников в этом классе';
-                studentSelect.appendChild(option);
-            } else {
-                const defaultOption = document.createElement('option');
-                defaultOption.value = '';
-                defaultOption.textContent = 'Выберите ученика';
-                studentSelect.appendChild(defaultOption);
-                
-                students.forEach(student => {
-                    const option = document.createElement('option');
-                    option.value = student.id;
-                    option.textContent = student.full_name;
-                    option.dataset.className = student.class_name; // Сохраняем класс ученика
-                    studentSelect.appendChild(option);
-                });
-            }
-        })
-        .catch(error => {
-            showToast('Ошибка', 'Не удалось загрузить список учеников', 'error');
-        });
-}
-        
-    
-            fetch(`/api/get_students`)
-                .then(response => response.json())
-                .then(students => {
-                    const student = students.find(s => s.id == studentId);
-                    
-                    if (student) {
-                        // Выбираем класс
-                        const classSelect = document.getElementById('classSelect');
-                        for (let i = 0; i < classSelect.options.length; i++) {
-                            if (classSelect.options[i].value === student.class_name) {
-                                classSelect.selectedIndex = i;
-                                break;
-                            }
-                        }
-                        
-                        // Загружаем список учеников класса
-                        loadStudentsByClass(student.class_name);
-                        
-                        // После загрузки списка учеников, выбираем нужного ученика
-                        setTimeout(() => {
-                            const studentSelect = document.getElementById('studentSelect');
-                            studentSelect.disabled = false;
-                            
-                            for (let i = 0; i < studentSelect.options.length; i++) {
-                                if (studentSelect.options[i].value == studentId) {
-                                    studentSelect.selectedIndex = i;
-                                    break;
-                                }
-                            }
-                        }, 500); // Даем время на загрузку списка учеников
-                    }
-                })
-                .catch(error => {
-                    showToast('Ошибка', 'Не удалось загрузить данные ученика', 'error');
-                });
-        }
-        
-        // Функция обновления таблицы сроков ликвидации задолженностей
-        function updateDeadlinesTable() {
-            const selectedSubjects = document.querySelectorAll('.subject-checkbox:checked');
-            const deadlinesTable = document.getElementById('deadlinesTable').querySelector('tbody');
-            
-            // Очищаем таблицу
-            deadlinesTable.innerHTML = '';
-            
-            // Добавляем строки для выбранных предметов
-            selectedSubjects.forEach(checkbox => {
-                const subjectId = checkbox.value;
-                const subjectName = checkbox.nextElementSibling.textContent.trim();
-                
-                const row = document.createElement('tr');
-                
-                // Ячейка с названием предмета
-                const subjectCell = document.createElement('td');
-                subjectCell.textContent = subjectName;
-                row.appendChild(subjectCell);
-                
-                // Ячейка с датой
-                const dateCell = document.createElement('td');
-                const dateInput = document.createElement('input');
-                dateInput.type = 'date';
-                dateInput.className = 'form-control';
-                dateInput.id = `date_${subjectId}`;
-                dateCell.appendChild(dateInput);
-                row.appendChild(dateCell);
-                
-                // Ячейка с временем
-                const timeCell = document.createElement('td');
-                const timeInput = document.createElement('input');
-                timeInput.type = 'time';
-                timeInput.className = 'form-control';
-                timeInput.id = `time_${subjectId}`;
-                timeCell.appendChild(timeInput);
-                row.appendChild(timeCell);
-                
-                // Ячейка с темой
-                const topicCell = document.createElement('td');
-                const topicInput = document.createElement('input');
-                topicInput.type = 'text';
-                topicInput.className = 'form-control';
-                topicInput.id = `topic_${subjectId}`;
-                topicInput.placeholder = 'Введите тему';
-                topicCell.appendChild(topicInput);
-                row.appendChild(topicCell);
-                
-                deadlinesTable.appendChild(row);
-            });
-        }
-        
-        // Функция для отображения toast-уведомлений
-        function showToast(title, message, type) {
-            const toast = document.getElementById('toast');
-            const toastTitle = document.getElementById('toastTitle');
-            const toastMessage = document.getElementById('toastMessage');
-            
-            toastTitle.textContent = title;
-            toastMessage.textContent = message;
-            
-            // Устанавливаем класс в зависимости от типа уведомления
-            toast.classList.remove('bg-success', 'bg-danger');
-            
-            if (type === 'success') {
-                toast.classList.add('bg-success', 'text-white');
-            } else if (type === 'error') {
-                toast.classList.add('bg-danger', 'text-white');
-            }
-            
-            const bsToast = new bootstrap.Toast(toast);
-            bsToast.show();
-        }
-    </script>
+    <script src="{{ url_for('static', filename='js/notification_form.js') }}"></script>
 </body>
 </html>
