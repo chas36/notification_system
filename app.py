@@ -110,144 +110,269 @@ def submit_notification():
         # Все предметы для уведомления
         all_subject_ids = failed_subject_ids + satisfactory_subject_ids
         
-        # Получаем информацию о дедлайне
-        need_deadline = request.form.get('need_deadline') == 'on'
-        deadline_date = request.form.get('deadline_date')
-        
-        # Создаем запись уведомления в БД
-        from database.db import create_notification, get_student_by_id
-        notification_id = create_notification(
-            student_id=student_id,
-            template_type_id=template_type_id,
-            period=period,
-            subjects_ids=all_subject_ids
-        )
-        
-        # Сохраняем дополнительные данные для генерации документа
-        from database.models import NotificationMeta, NotificationConsultation
+        # Создаем сессию
         from database.db import get_session
-        
         session = get_session()
         
-        # Сохраняем информацию о разделении предметов
-        meta = NotificationMeta(
-            notification_id=notification_id,
-            key='failed_subjects',
-            value=','.join(failed_subjects)
-        )
-        session.add(meta)
-        
-        if satisfactory_subjects:
-            meta = NotificationMeta(
-                notification_id=notification_id,
-                key='satisfactory_subjects',
-                value=','.join(satisfactory_subjects)
+        try:
+            # Создаем запись уведомления в БД
+            from database.db import create_notification
+            notification_id = create_notification(
+                student_id=student_id,
+                template_type_id=template_type_id,
+                period=period,
+                subjects_ids=all_subject_ids
             )
-            session.add(meta)
-        
-        # Сохраняем дату дедлайна, если указана
-        if need_deadline and deadline_date:
-            meta = NotificationMeta(
-                notification_id=notification_id,
-                key='deadline_date',
-                value=deadline_date
-            )
-            session.add(meta)
-        
-        # Проверяем, нужно ли добавлять график консультаций
-        need_consultations = request.form.get('need_consultations') == 'on'
-        
-        if need_consultations:
-            # Обрабатываем консультации для предметов с задолженностями
-            for subject in failed_subjects:
-                subject_key = subject.replace(' ', '_')
-                topics_count_key = f'failed_topics_count_{subject_key}'
-                topics_count = int(request.form.get(topics_count_key, 1))
-                
-                for i in range(1, topics_count + 1):
-                    prefix = f'failed_consultations_{subject_key}_topic_{i}'
-                    
-                    # Получаем данные консультации
-                    topic_name = request.form.get(f'{prefix}_name', '')
-                    date = request.form.get(f'{prefix}_date', '')
-                    lesson_id = request.form.get(f'{prefix}_lesson', '')
-                    
-                    if date and lesson_id:
-                        # Получаем время урока
-                        from database.db import get_schedule_times
-                        schedule_times = get_schedule_times()
-                        lesson_info = next((t for t in schedule_times if str(t['id']) == lesson_id), None)
-                        
-                        if lesson_info:
-                            time = lesson_info['start']
-                            
-                            # Сохраняем консультацию
-                            subject_id = get_subject_by_name(subject)
-                            consultation = NotificationConsultation(
-                                notification_id=notification_id,
-                                subject_id=subject_id,
-                                topic_name=topic_name,
-                                date=date,
-                                time=time,
-                                topic_type='failed'  # Тип "задолженность"
-                            )
-                            session.add(consultation)
             
-            # Обрабатываем консультации для предметов с удовлетворительными оценками
-            for subject in satisfactory_subjects:
-                subject_key = subject.replace(' ', '_')
-                topics_count_key = f'satisfactory_topics_count_{subject_key}'
-                topics_count = int(request.form.get(topics_count_key, 1))
-                
-                for i in range(1, topics_count + 1):
-                    prefix = f'satisfactory_consultations_{subject_key}_topic_{i}'
+            # Сохраняем дополнительные данные для генерации документа
+            from database.models import NotificationMeta, NotificationConsultation
+            
+            # Сохраняем информацию о разделении предметов
+            meta = NotificationMeta(
+                notification_id=notification_id,
+                key='failed_subjects',
+                value=','.join(failed_subjects)
+            )
+            session.add(meta)
+            
+            if satisfactory_subjects:
+                meta = NotificationMeta(
+                    notification_id=notification_id,
+                    key='satisfactory_subjects',
+                    value=','.join(satisfactory_subjects)
+                )
+                session.add(meta)
+            
+            # Сохраняем дату дедлайна, если указана
+            need_deadline = request.form.get('need_deadline') == 'on'
+            deadline_date = request.form.get('deadline_date')
+            if need_deadline and deadline_date:
+                meta = NotificationMeta(
+                    notification_id=notification_id,
+                    key='deadline_date',
+                    value=deadline_date
+                )
+                session.add(meta)
+            
+            # Проверяем, нужно ли добавлять график консультаций
+            need_consultations = request.form.get('need_consultations') == 'on'
+            
+            if need_consultations:
+                # Обрабатываем консультации для предметов с задолженностями
+                for subject in failed_subjects:
+                    subject_key = subject.replace(' ', '_')
                     
-                    # Получаем данные консультации
-                    topic_name = request.form.get(f'{prefix}_name', '')
-                    date = request.form.get(f'{prefix}_date', '')
-                    lesson_id = request.form.get(f'{prefix}_lesson', '')
+                    # Получаем количество тем для каждого предмета
+                    topics_count_key = f'failed_topics_count_{subject_key}'
+                    topics_count = int(request.form.get(topics_count_key, 1))
                     
-                    if date and lesson_id:
-                        # Получаем время урока
-                        from database.db import get_schedule_times
-                        schedule_times = get_schedule_times()
-                        lesson_info = next((t for t in schedule_times if str(t['id']) == lesson_id), None)
+                    for i in range(1, topics_count + 1):
+                        prefix = f'failed_consultations_{subject_key}_topic_{i}'
                         
-                        if lesson_info:
-                            time = lesson_info['start']
+                        # Получаем данные консультации
+                        topic_name = request.form.get(f'{prefix}_name', '')
+                        date = request.form.get(f'{prefix}_date', '')
+                        lesson_id = request.form.get(f'{prefix}_lesson', '')
+                        
+                        if date and lesson_id:
+                            # Получаем время урока
+                            from database.db import get_schedule_times
+                            schedule_times = get_schedule_times()
+                            lesson_info = next((t for t in schedule_times if str(t['id']) == lesson_id), None)
                             
-                            # Сохраняем консультацию
-                            subject_id = get_subject_by_name(subject)
-                            consultation = NotificationConsultation(
-                                notification_id=notification_id,
-                                subject_id=subject_id,
-                                topic_name=topic_name,
-                                date=date,
-                                time=time,
-                                topic_type='satisfactory'  # Тип "удовлетворительно"
-                            )
-                            session.add(consultation)
+                            if lesson_info:
+                                time = lesson_info['start']
+                                
+                                # Сохраняем консультацию
+                                subject_id = get_subject_by_name(subject)
+                                consultation = NotificationConsultation(
+                                    notification_id=notification_id,
+                                    subject_id=subject_id,
+                                    topic_name=topic_name,  # Может быть пустым
+                                    date=date,
+                                    time=time,
+                                    topic_type='failed'  # Тип "задолженность"
+                                )
+                                session.add(consultation)
+            
+            # Сохраняем все изменения
+            session.commit()
+            
+            # Генерируем документ
+            from utils.document_generator import generate_document
+            result = generate_document(notification_id)
+            
+            if result['success']:
+                return jsonify({
+                    'success': True, 
+                    'message': 'Уведомление успешно создано', 
+                    'file_path': result['file_path'],
+                    'file_name': result['file_name']
+                })
+            else:
+                # Если что-то пошло не так с генерацией документа, откатываем транзакцию
+                session.rollback()
+                return jsonify({
+                    'success': False, 
+                    'message': f'Ошибка при создании документа: {result["message"]}'
+                })
+                
+        except Exception as e:
+            # В случае ошибки откатываем транзакцию
+            session.rollback()
+            raise e
+        finally:
+            # Закрываем сессию
+            session.close()
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'message': f'Ошибка при создании уведомления: {str(e)}'
+        })
+    """Обработка формы создания уведомления"""
+    try:
+        # Получаем основные данные
+        student_id = request.form.get('student_id')
+        template_type_id = request.form.get('template_type_id')
+        period = request.form.get('period')
         
-        # Сохраняем все изменения
-        session.commit()
-        session.close()
+        # Проверяем обязательные поля
+        if not student_id or not template_type_id or not period:
+            return jsonify({'success': False, 'message': 'Заполните все обязательные поля'})
         
-        # Генерируем документ
-        from utils.document_generator import generate_document
-        result = generate_document(notification_id)
+        # Получаем данные о выбранных предметах
+        failed_subjects = request.form.getlist('failed_subjects[]')
+        satisfactory_subjects = request.form.getlist('satisfactory_subjects[]')
         
-        if result['success']:
-            return jsonify({
-                'success': True, 
-                'message': 'Уведомление успешно создано', 
-                'file_path': result['file_path'],
-                'file_name': result['file_name']
-            })
-        else:
-            return jsonify({
-                'success': False, 
-                'message': f'Ошибка при создании документа: {result["message"]}'
-            })
+        if not failed_subjects and not satisfactory_subjects:
+            return jsonify({'success': False, 'message': 'Выберите хотя бы один предмет'})
+        
+        # Получаем ID предметов
+        from database.db import get_subject_by_name
+        failed_subject_ids = [get_subject_by_name(subject) for subject in failed_subjects]
+        satisfactory_subject_ids = [get_subject_by_name(subject) for subject in satisfactory_subjects]
+        
+        # Все предметы для уведомления
+        all_subject_ids = failed_subject_ids + satisfactory_subject_ids
+        
+        # Создаем сессию
+        from database.db import get_session
+        session = get_session()
+        
+        try:
+            # Создаем запись уведомления в БД
+            from database.db import create_notification
+            notification_id = create_notification(
+                student_id=student_id,
+                template_type_id=template_type_id,
+                period=period,
+                subjects_ids=all_subject_ids
+            )
+            
+            # Сохраняем дополнительные данные для генерации документа
+            from database.models import NotificationMeta, NotificationConsultation
+            
+            # Сохраняем информацию о разделении предметов
+            meta = NotificationMeta(
+                notification_id=notification_id,
+                key='failed_subjects',
+                value=','.join(failed_subjects)
+            )
+            session.add(meta)
+            
+            if satisfactory_subjects:
+                meta = NotificationMeta(
+                    notification_id=notification_id,
+                    key='satisfactory_subjects',
+                    value=','.join(satisfactory_subjects)
+                )
+                session.add(meta)
+            
+            # Сохраняем дату дедлайна, если указана
+            need_deadline = request.form.get('need_deadline') == 'on'
+            deadline_date = request.form.get('deadline_date')
+            if need_deadline and deadline_date:
+                meta = NotificationMeta(
+                    notification_id=notification_id,
+                    key='deadline_date',
+                    value=deadline_date
+                )
+                session.add(meta)
+            
+            # Проверяем, нужно ли добавлять график консультаций
+            need_consultations = request.form.get('need_consultations') == 'on'
+            
+            if need_consultations:
+                # Обрабатываем консультации для предметов с задолженностями
+                for subject in failed_subjects:
+                    subject_key = subject.replace(' ', '_')
+                    
+                    # Получаем количество тем для каждого предмета
+                    topics_count_key = f'failed_topics_count_{subject_key}'
+                    topics_count = int(request.form.get(topics_count_key, 1))
+                    
+                    for i in range(1, topics_count + 1):
+                        prefix = f'failed_consultations_{subject_key}_topic_{i}'
+                        
+                        # Получаем данные консультации
+                        topic_name = request.form.get(f'{prefix}_name', '')
+                        date = request.form.get(f'{prefix}_date', '')
+                        lesson_id = request.form.get(f'{prefix}_lesson', '')
+                        
+                        if date and lesson_id:
+                            # Получаем время урока
+                            from database.db import get_schedule_times
+                            schedule_times = get_schedule_times()
+                            lesson_info = next((t for t in schedule_times if str(t['id']) == lesson_id), None)
+                            
+                            if lesson_info:
+                                time = lesson_info['start']
+                                
+                                # Сохраняем консультацию
+                                subject_id = get_subject_by_name(subject)
+                                consultation = NotificationConsultation(
+                                    notification_id=notification_id,
+                                    subject_id=subject_id,
+                                    topic_name=topic_name,  # Может быть пустым
+                                    date=date,
+                                    time=time,
+                                    topic_type='failed'  # Тип "задолженность"
+                                )
+                                session.add(consultation)
+            
+            # Сохраняем все изменения
+            session.commit()
+            
+            # Генерируем документ
+            from utils.document_generator import generate_document
+            result = generate_document(notification_id)
+            
+            if result['success']:
+                return jsonify({
+                    'success': True, 
+                    'message': 'Уведомление успешно создано', 
+                    'file_path': result['file_path'],
+                    'file_name': result['file_name']
+                })
+            else:
+                # Если что-то пошло не так с генерацией документа, откатываем транзакцию
+                session.rollback()
+                return jsonify({
+                    'success': False, 
+                    'message': f'Ошибка при создании документа: {result["message"]}'
+                })
+                
+        except Exception as e:
+            # В случае ошибки откатываем транзакцию
+            session.rollback()
+            raise e
+        finally:
+            # Закрываем сессию
+            session.close()
+            
     except Exception as e:
         import traceback
         traceback.print_exc()

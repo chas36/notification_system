@@ -4,7 +4,7 @@ from docx import Document
 import os
 from datetime import datetime
 from database.db import get_notification_with_details, get_session
-from database.models import NotificationMeta, NotificationConsultation
+from database.models import NotificationMeta, NotificationConsultation, Subject
 
 def generate_document(notification_id):
     """Генерирует документ уведомления на основе данных из БД и нового шаблона"""
@@ -28,13 +28,30 @@ def generate_document(notification_id):
         student = notification_data['student']
         subjects = notification_data['subjects']
         
-        # Получаем дополнительные метаданные
+        # Получаем дополнительные метаданные и консультации с предварительной загрузкой связанных данных
         session = get_session()
         meta_records = session.query(NotificationMeta).filter_by(notification_id=notification_id).all()
         meta = {item.key: item.value for item in meta_records}
         
-        # Получаем консультации
-        consultations = session.query(NotificationConsultation).filter_by(notification_id=notification_id).all()
+        # Важно: получаем объекты консультаций И связанные объекты предметов в рамках одной сессии
+        # Используем joinedload для предзагрузки атрибута subject
+        from sqlalchemy.orm import joinedload
+        consultations_query = session.query(NotificationConsultation).options(
+            joinedload(NotificationConsultation.subject)
+        ).filter_by(notification_id=notification_id).all()
+        
+        # Создаем словарь с полной информацией о консультациях, включая имя предмета
+        consultations = []
+        for consultation in consultations_query:
+            consultations.append({
+                'subject_name': consultation.subject.name,
+                'topic_name': consultation.topic_name,
+                'date': consultation.date,
+                'time': consultation.time,
+                'topic_type': consultation.topic_type
+            })
+        
+        # Теперь можно закрыть сессию, так как все данные уже получены
         session.close()
         
         # Определяем типы предметов
@@ -106,11 +123,10 @@ def generate_document(notification_id):
             hdr_cells[2].text = "Дата"
             hdr_cells[3].text = "Время"
             
-            # Группируем консультации по предметам и типам
+            # Группируем консультации по предметам
             consultations_by_subject = {}
-            
             for consultation in consultations:
-                subject_name = consultation.subject.name
+                subject_name = consultation['subject_name']
                 if subject_name not in consultations_by_subject:
                     consultations_by_subject[subject_name] = []
                 
@@ -127,9 +143,9 @@ def generate_document(notification_id):
                     else:
                         row_cells[0].text = ""
                     
-                    row_cells[1].text = consultation.topic_name
-                    row_cells[2].text = consultation.date
-                    row_cells[3].text = consultation.time
+                    row_cells[1].text = consultation['topic_name'] or ""
+                    row_cells[2].text = consultation['date']
+                    row_cells[3].text = consultation['time']
         
         # Определяем учебный год
         now = datetime.now()

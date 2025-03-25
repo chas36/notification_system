@@ -10,16 +10,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const goToStep3Button = document.getElementById('goToStep3');
     const backToStep1Button = document.getElementById('backToStep1');
     const backToStep2Button = document.getElementById('backToStep2');
-    const templateSelect = document.getElementById('templateType');
-    const templateDescription = document.getElementById('templateDescription');
-    const periodTypeSelect = document.getElementById('periodType');
-    const periodSelect = document.getElementById('period');
     const classSelect = document.getElementById('classSelect');
     const studentSelect = document.getElementById('studentSelect');
+    const periodTypeSelect = document.getElementById('periodType');
+    const periodSelect = document.getElementById('period');
     const needConsultationsCheckbox = document.getElementById('needConsultationsSchedule');
     const needDeadlineCheckbox = document.getElementById('needDeadline');
     const deadlineSection = document.getElementById('deadlineSection');
-    const satisfactorySubjectsSection = document.getElementById('satisfactorySubjectsSection');
     
     // Загружаем список классов
     loadClasses();
@@ -29,12 +26,6 @@ document.addEventListener('DOMContentLoaded', function() {
     goToStep3Button.addEventListener('click', validateAndGoToStep3);
     backToStep1Button.addEventListener('click', goToStep1);
     backToStep2Button.addEventListener('click', goToStep2);
-    
-    // Обработчик изменения типа шаблона
-    templateSelect.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        templateDescription.textContent = selectedOption.dataset.description || '';
-    });
     
     // Обработчик изменения типа периода
     periodTypeSelect.addEventListener('change', function() {
@@ -87,16 +78,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Включаем список и загружаем учеников данного класса
         studentSelect.disabled = false;
         loadStudentsByClass(className);
-        
-        // Определяем, является ли класс "А" классом
-        const isClassA = className.includes('А') || className.includes('A');
-        
-        // Показываем/скрываем секцию удовлетворительных оценок в зависимости от класса
-        if (isClassA) {
-            satisfactorySubjectsSection.classList.add('d-none');
-        } else {
-            satisfactorySubjectsSection.classList.remove('d-none');
-        }
     });
     
     // Обработчик изменения чекбокса графика консультаций
@@ -161,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Функция валидации и перехода к шагу 2
     function validateAndGoToStep2() {
         // Проверяем обязательные поля
-        const templateType = templateSelect.value;
+        const templateType = document.getElementById('templateType').value;
         const periodType = periodTypeSelect.value;
         const period = periodSelect.value;
         const classValue = classSelect.value;
@@ -293,6 +274,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const satisfactorySubjectsContainer = document.getElementById('satisfactorySubjectsContainer');
                 satisfactorySubjectsContainer.innerHTML = '';
                 
+                // Определяем, является ли класс "A" классом
+                const isClassA = className.includes('А') || className.includes('A');
+                
+                // Показываем/скрываем секцию удовлетворительных оценок в зависимости от класса
+                const satisfactorySubjectsSection = document.getElementById('satisfactorySubjectsSection');
+                if (isClassA) {
+                    satisfactorySubjectsSection.classList.add('d-none');
+                } else {
+                    satisfactorySubjectsSection.classList.remove('d-none');
+                }
+                
                 subjects.forEach((subject, index) => {
                     // Добавляем в список задолженностей
                     const failedCol = document.createElement('div');
@@ -319,7 +311,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Добавляем чекбокс в список удовлетворительных оценок
                     // (только для классов без литеры "А")
-                    const isClassA = className.includes('А') || className.includes('A');
                     if (!isClassA) {
                         const satisfactoryCol = document.createElement('div');
                         satisfactoryCol.className = 'col-md-4 mb-3';
@@ -331,13 +322,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <label class="form-check-label" for="satisfactory_${index}">
                                         ${subject}
                                     </label>
-                                </div>
-                                <div class="ms-4 mt-2 subject-details d-none">
-                                    <div class="mb-2">
-                                        <label class="form-label small">Количество тем с оценкой "3":</label>
-                                        <input type="number" class="form-control form-control-sm" 
-                                            name="satisfactory_topics_count_${subject.replace(/\s+/g, '_')}" min="1" value="1">
-                                    </div>
                                 </div>
                             </div>
                         `;
@@ -360,10 +344,12 @@ document.addEventListener('DOMContentLoaded', function() {
         subjectCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', function() {
                 const subjectDetails = this.closest('.subject-item').querySelector('.subject-details');
-                if (this.checked) {
-                    subjectDetails.classList.remove('d-none');
-                } else {
-                    subjectDetails.classList.add('d-none');
+                if (subjectDetails) {
+                    if (this.checked) {
+                        subjectDetails.classList.remove('d-none');
+                    } else {
+                        subjectDetails.classList.add('d-none');
+                    }
                 }
             });
         });
@@ -387,21 +373,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
         
-        // Получаем выбранные предметы с удовлетворительными оценками
-        const satisfactorySubjects = [];
-        document.querySelectorAll('input[name="satisfactory_subjects[]"]:checked').forEach(checkbox => {
-            const subjectName = checkbox.value;
-            const topicsCountInput = document.querySelector(`input[name="satisfactory_topics_count_${subjectName.replace(/\s+/g, '_')}"]`);
-            const topicsCount = topicsCountInput ? parseInt(topicsCountInput.value) : 1;
-            
-            satisfactorySubjects.push({
-                name: subjectName,
-                topicsCount: topicsCount
-            });
-        });
-        
         // Если нет выбранных предметов, показываем сообщение
-        if (failedSubjects.length === 0 && satisfactorySubjects.length === 0) {
+        if (failedSubjects.length === 0) {
             consultationsScheduleSection.innerHTML = '<div class="alert alert-warning">Нет выбранных предметов для графика консультаций</div>';
             return;
         }
@@ -410,102 +383,220 @@ document.addEventListener('DOMContentLoaded', function() {
         failedSubjects.forEach(subject => {
             const subjectSection = document.createElement('div');
             subjectSection.className = 'card mb-3';
+            subjectSection.dataset.subject = subject.name;
             
-            subjectSection.innerHTML = `
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">${subject.name} - Задолженность</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        ${generateTopicConsultationsInputs(subject.name, 'failed', subject.topicsCount)}
-                    </div>
-                </div>
+            // Заголовок секции предмета с кнопкой добавления консультации
+            const header = document.createElement('div');
+            header.className = 'card-header bg-danger text-white d-flex justify-content-between align-items-center';
+            header.innerHTML = `
+                <h5 class="mb-0">${subject.name} - Задолженность</h5>
+                <button type="button" class="btn btn-light btn-sm add-consultation-btn" data-subject="${subject.name}">
+                    <i class="bi bi-plus-circle"></i> Добавить консультацию
+                </button>
             `;
+            subjectSection.appendChild(header);
             
+            // Тело карточки с темами
+            const body = document.createElement('div');
+            body.className = 'card-body';
+            
+            // Контейнер для тем
+            const topicsContainer = document.createElement('div');
+            topicsContainer.className = 'topics-container';
+            topicsContainer.id = `topics-container-${subject.name.replace(/\s+/g, '_')}`;
+            
+            // Создаем разделы для каждой темы
+            for (let i = 1; i <= subject.topicsCount; i++) {
+                const topicSection = createTopicSection(subject.name, i);
+                topicsContainer.appendChild(topicSection);
+            }
+            
+            body.appendChild(topicsContainer);
+            subjectSection.appendChild(body);
             consultationsScheduleSection.appendChild(subjectSection);
         });
         
-        // Создаем разделы для каждого предмета с удовлетворительными оценками
-        satisfactorySubjects.forEach(subject => {
-            const subjectSection = document.createElement('div');
-            subjectSection.className = 'card mb-3';
-            
-            subjectSection.innerHTML = `
-                <div class="card-header bg-warning">
-                    <h5 class="mb-0">${subject.name} - Удовлетворительно</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        ${generateTopicConsultationsInputs(subject.name, 'satisfactory', subject.topicsCount)}
-                    </div>
-                </div>
-            `;
-            
-            consultationsScheduleSection.appendChild(subjectSection);
+        // Добавляем обработчики для кнопок добавления консультаций
+        document.querySelectorAll('.add-consultation-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const subjectName = this.dataset.subject;
+                const topicsContainer = document.querySelector(`#topics-container-${subjectName.replace(/\s+/g, '_')}`);
+                
+                // Находим последний номер темы и увеличиваем его на 1
+                const existingTopics = topicsContainer.querySelectorAll('.topic-section');
+                const nextTopicNumber = existingTopics.length + 1;
+                
+                // Создаем новый раздел для темы
+                const newTopicSection = createTopicSection(subjectName, nextTopicNumber);
+                topicsContainer.appendChild(newTopicSection);
+                
+                // Обновляем счетчик тем в форме
+                const topicsCountInput = document.querySelector(`input[name="failed_topics_count_${subjectName.replace(/\s+/g, '_')}"]`);
+                if (topicsCountInput) {
+                    topicsCountInput.value = nextTopicNumber;
+                }
+                
+                // Загружаем расписание звонков для новой консультации
+                loadScheduleTimesForTopic(subjectName, nextTopicNumber);
+            });
         });
         
-        // Загружаем расписание звонков для выбора времени
+        // Загружаем расписание звонков для всех тем
         loadScheduleTimes();
     }
     
-    // Функция генерации полей ввода для консультаций по темам
-    function generateTopicConsultationsInputs(subjectName, type, topicsCount) {
-        let html = '';
+    // Функция создания раздела для темы
+    function createTopicSection(subjectName, topicNumber) {
+        const topicSection = document.createElement('div');
+        topicSection.className = 'topic-section mb-4';
+        topicSection.dataset.topicNumber = topicNumber;
         
-        for (let i = 1; i <= topicsCount; i++) {
-            const subjectKey = subjectName.replace(/\s+/g, '_');
-            const namePrefix = `${type}_consultations_${subjectKey}_topic_${i}`;
-            
-            html += `
-                <div class="col-12 mb-3">
-                    <h6>Тема ${i}</h6>
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <label class="form-label">Название темы/периода</label>
-                            <input type="text" class="form-control" name="${namePrefix}_name" placeholder="Название темы">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Дата консультации</label>
-                            <input type="date" class="form-control" name="${namePrefix}_date">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Урок (время)</label>
-                            <select class="form-control lesson-select" name="${namePrefix}_lesson">
-                                <option value="">Выберите урок</option>
-                                <!-- Варианты будут загружены через JS -->
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+        // Заголовок темы с возможностью удаления
+        const topicHeader = document.createElement('div');
+        topicHeader.className = 'd-flex justify-content-between align-items-center mb-2';
+        topicHeader.innerHTML = `
+            <h6>Консультация ${topicNumber}</h6>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-topic-btn" 
+                data-subject="${subjectName}" data-topic="${topicNumber}">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
         
-        return html;
+        // Форма для консультации
+        const consultationForm = document.createElement('div');
+        consultationForm.className = 'row g-2';
+        consultationForm.innerHTML = `
+            <div class="col-md-6">
+                <label class="form-label">Тема (необязательно)</label>
+                <input type="text" class="form-control" 
+                    name="failed_consultations_${subjectName.replace(/\s+/g, '_')}_topic_${topicNumber}_name" 
+                    placeholder="Название темы (не обязательно)">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Дата консультации</label>
+                <input type="date" class="form-control" 
+                    name="failed_consultations_${subjectName.replace(/\s+/g, '_')}_topic_${topicNumber}_date" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Урок (время)</label>
+                <select class="form-control lesson-select" 
+                    name="failed_consultations_${subjectName.replace(/\s+/g, '_')}_topic_${topicNumber}_lesson" required>
+                    <option value="">Выберите урок</option>
+                    <!-- Варианты будут загружены через JS -->
+                </select>
+            </div>
+        `;
+        
+        topicSection.appendChild(topicHeader);
+        topicSection.appendChild(consultationForm);
+        
+        // Добавляем обработчик для кнопки удаления темы
+        setTimeout(() => {
+            const removeButton = topicSection.querySelector('.remove-topic-btn');
+            if (removeButton) {
+                removeButton.addEventListener('click', function() {
+                    // Если это единственная тема, не даем удалить
+                    const topicsContainer = topicSection.closest('.topics-container');
+                    if (topicsContainer.querySelectorAll('.topic-section').length <= 1) {
+                        showToast('Внимание', 'Должна быть хотя бы одна консультация', 'error');
+                        return;
+                    }
+                    
+                    // Удаляем секцию темы
+                    topicSection.remove();
+                    
+                    // Перенумеровываем оставшиеся темы
+                    renumberTopics(topicsContainer, subjectName);
+                });
+            }
+        }, 0);
+        
+        return topicSection;
     }
     
-    // Функция загрузки расписания звонков
+    // Функция для перенумерации тем после удаления
+    function renumberTopics(topicsContainer, subjectName) {
+        const topics = topicsContainer.querySelectorAll('.topic-section');
+        
+        topics.forEach((topic, index) => {
+            const newNumber = index + 1;
+            const oldNumber = parseInt(topic.dataset.topicNumber);
+            
+            // Обновляем заголовок
+            const header = topic.querySelector('h6');
+            if (header) {
+                header.textContent = `Консультация ${newNumber}`;
+            }
+            
+            // Обновляем data-атрибут
+            topic.dataset.topicNumber = newNumber;
+            
+            // Обновляем атрибуты кнопки удаления
+            const removeButton = topic.querySelector('.remove-topic-btn');
+            if (removeButton) {
+                removeButton.dataset.topic = newNumber;
+            }
+            
+            // Обновляем имена полей
+            if (oldNumber !== newNumber) {
+                const inputs = topic.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    const oldName = input.name;
+                    const newName = oldName.replace(`_topic_${oldNumber}_`, `_topic_${newNumber}_`);
+                    input.name = newName;
+                });
+            }
+        });
+        
+        // Обновляем счетчик тем в форме
+        const topicsCountInput = document.querySelector(`input[name="failed_topics_count_${subjectName.replace(/\s+/g, '_')}"]`);
+        if (topicsCountInput) {
+            topicsCountInput.value = topics.length;
+        }
+    }
+    
+    // Функция загрузки расписания звонков для всех тем
     function loadScheduleTimes() {
         fetch('/api/get_schedule_times')
             .then(response => response.json())
             .then(times => {
+                window.scheduleTimes = times; // Сохраняем для использования в других функциях
+                
                 const lessonSelects = document.querySelectorAll('.lesson-select');
                 
                 lessonSelects.forEach(select => {
-                    // Добавляем первую пустую опцию
-                    select.innerHTML = '<option value="">Выберите урок</option>';
-                    
-                    // Добавляем варианты с уроками
-                    times.forEach(time => {
-                        const option = document.createElement('option');
-                        option.value = time.id;
-                        option.textContent = `${time.name} (${time.start} - ${time.end})`;
-                        select.appendChild(option);
-                    });
+                    populateLessonSelect(select, times);
                 });
             })
             .catch(error => {
                 showToast('Ошибка', 'Не удалось загрузить расписание звонков', 'error');
             });
+    }
+    
+    // Функция загрузки расписания звонков для конкретной темы
+    function loadScheduleTimesForTopic(subjectName, topicNumber) {
+        if (window.scheduleTimes) {
+            const select = document.querySelector(`select[name="failed_consultations_${subjectName.replace(/\s+/g, '_')}_topic_${topicNumber}_lesson"]`);
+            if (select) {
+                populateLessonSelect(select, window.scheduleTimes);
+            }
+        } else {
+            loadScheduleTimes();
+        }
+    }
+    
+    // Функция заполнения селекта с расписанием звонков
+    function populateLessonSelect(select, times) {
+        // Добавляем первую пустую опцию
+        select.innerHTML = '<option value="">Выберите урок</option>';
+        
+        // Добавляем варианты с уроками
+        times.forEach(time => {
+            const option = document.createElement('option');
+            option.value = time.id;
+            option.textContent = `${time.name} (${time.start} - ${time.end})`;
+            select.appendChild(option);
+        });
     }
     
     // Функция для отображения toast-уведомлений
