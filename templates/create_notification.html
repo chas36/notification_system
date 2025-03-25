@@ -207,89 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Функция загрузки списка классов
-function loadClasses() {
-    console.log('Загрузка списка классов...');
-    fetch('/api/get_unique_classes')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(classes => {
-            console.log('Получены классы:', classes);
-            const classSelect = document.getElementById('classSelect');
-            
-            // Очищаем текущие варианты, кроме placeholder
-            classSelect.innerHTML = '<option value="">Выберите класс</option>';
-            
-            if (classes && classes.length > 0) {
-                // Добавляем классы в том порядке, в котором их вернул сервер
-                classes.forEach(className => {
-                    const option = document.createElement('option');
-                    option.value = className;
-                    option.textContent = className;
-                    classSelect.appendChild(option);
-                });
-            } else {
-                console.log('Нет доступных классов');
-                // Если классов нет, добавляем сообщение
-                const option = document.createElement('option');
-                option.disabled = true;
-                option.textContent = 'Нет доступных классов';
-                classSelect.appendChild(option);
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка при загрузке классов:', error);
-            showToast('Ошибка', 'Не удалось загрузить список классов: ' + error.message, 'error');
-        });
-}
 
-// Функция загрузки учеников по классу
-function loadStudentsByClass(className) {
-    console.log('Загрузка учеников для класса:', className);
-    fetch(`/api/get_students_by_class/${encodeURIComponent(className)}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(students => {
-            console.log('Получены ученики:', students);
-            const studentSelect = document.getElementById('studentSelect');
-            
-            // Очищаем список
-            studentSelect.innerHTML = '';
-            
-            if (students.length === 0) {
-                console.log('Нет учеников в классе', className);
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = 'Нет учеников в этом классе';
-                studentSelect.appendChild(option);
-            } else {
-                const defaultOption = document.createElement('option');
-                defaultOption.value = '';
-                defaultOption.textContent = 'Выберите ученика';
-                studentSelect.appendChild(defaultOption);
-                
-                students.forEach(student => {
-                    const option = document.createElement('option');
-                    option.value = student.id;
-                    option.textContent = student.full_name;
-                    option.dataset.className = student.class_name;
-                    studentSelect.appendChild(option);
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка при загрузке учеников:', error);
-            showToast('Ошибка', 'Не удалось загрузить список учеников: ' + error.message, 'error');
-        });
-}
 
 // Функция загрузки данных ученика по ID
 function loadStudentDetails(studentId) {
@@ -325,7 +243,6 @@ setTimeout(() => {
     studentSelect.disabled = false;
     
     for (let i = 0; i < studentSelect.options.length; i++) {
-        if (studentSelect.options[i].value == studentId) {
         if (studentSelect.options[i].value == studentId) {
             studentSelect.selectedIndex = i;
             break;
@@ -527,23 +444,8 @@ row.appendChild(timeInputElement);
             const classSelect = document.getElementById('classSelect');
             const studentSelect = document.getElementById('studentSelect');
             
-            classSelect.addEventListener('change', function() {
-                const className = this.value;
-                
-                // Очищаем и отключаем список учеников, если класс не выбран
-                studentSelect.innerHTML = '';
-                
-                if (!className) {
-                    studentSelect.disabled = true;
-                    studentSelect.innerHTML = '<option value="">Сначала выберите класс</option>';
-                    return;
-                }
-                
-                // Включаем список и загружаем учеников данного класса
-                studentSelect.disabled = false;
-                loadStudentsByClass(className);
-            });
-            
+           
+        
             // Обработка изменения списка предметов
             const subjectCheckboxes = document.querySelectorAll('.subject-checkbox');
             
@@ -680,8 +582,7 @@ function loadStudentsByClass(className) {
         });
 }
         
-        // Функция загрузки данных ученика по ID
-        function loadStudentDetails(studentId) {
+    
             fetch(`/api/get_students`)
                 .then(response => response.json())
                 .then(students => {
