@@ -1,13 +1,15 @@
 # utils/document_generator.py
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Pt
 import os
 from datetime import datetime
 from database.db import get_notification_with_details, get_session
 from database.models import NotificationMeta, NotificationConsultation, Subject
 
 def generate_document(notification_id):
-    """Генерирует документ уведомления на основе данных из БД и нового шаблона"""
+    """Генерирует документ уведомления на основе данных из БД и шаблона"""
     # Получаем данные уведомления
     notification_data = get_notification_with_details(notification_id)
     
@@ -33,8 +35,7 @@ def generate_document(notification_id):
         meta_records = session.query(NotificationMeta).filter_by(notification_id=notification_id).all()
         meta = {item.key: item.value for item in meta_records}
         
-        # Важно: получаем объекты консультаций И связанные объекты предметов в рамках одной сессии
-        # Используем joinedload для предзагрузки атрибута subject
+        # Предзагружаем связанные объекты предметов в рамках одной сессии
         from sqlalchemy.orm import joinedload
         consultations_query = session.query(NotificationConsultation).options(
             joinedload(NotificationConsultation.subject)
@@ -72,99 +73,149 @@ def generate_document(notification_id):
         # Определяем, является ли класс "A" классом
         is_class_a = "А" in student.class_name or "A" in student.class_name
         
-        # Формируем текст уведомления
-        notification_text = f"Администрация школы доводит до Вашего сведения, что учащийся {student.full_name} класса {student.class_name} по результатам промежуточной аттестации имеет:"
+        # Находим заголовок "Уведомление" и добавляем основной текст после него
+        header_found = False
+        header_index = -1
         
-        # Находим или создаем параграф для основного текста
-        main_text_found = False
         for i, paragraph in enumerate(doc.paragraphs):
             if "Уведомление" in paragraph.text:
-                # Если нашли заголовок, добавляем текст после него
-                insertion_index = i + 1
-                if insertion_index < len(doc.paragraphs):
-                    doc.paragraphs[insertion_index].text = notification_text
-                else:
-                    doc.add_paragraph(notification_text)
-                main_text_found = True
+                header_found = True
+                header_index = i
                 break
         
-        if not main_text_found:
-            # Если заголовок не найден, добавляем в конец документа
-            doc.add_paragraph("Уведомление")
-            doc.add_paragraph(notification_text)
-        
-        # Добавляем список предметов с неудовлетворительными оценками
-        if failed_subjects:
-            failed_subjects_text = ", ".join([s.name for s in failed_subjects])
-            doc.add_paragraph(f"- неудовлетворительные отметки по предметам: {failed_subjects_text}")
-        
-        # Для классов, кроме "А", также добавляем удовлетворительные оценки по углубленным предметам
-        if not is_class_a and satisfactory_subjects:
-            satisfactory_subjects_text = ", ".join([s.name for s in satisfactory_subjects])
-            doc.add_paragraph(f"- удовлетворительные отметки по предметам, изучаемым на углубленном уровне: {satisfactory_subjects_text}")
-        
-        # Добавляем информацию о возможном переводе (для всех классов, кроме "А")
-        if not is_class_a and 'deadline_date' in meta:
-            deadline_date = meta['deadline_date']
-            doc.add_paragraph(f"В случае, если данные оценки не будут исправлены до {deadline_date}, то по решению Педагогического совета в соответствии с положением школы о классах с углубленным изучением отдельных предметов может быть осуществлен перевод в общеобразовательный класс.")
-        
-        # Добавляем график ликвидации задолженностей, если он есть
-        if consultations:
-            doc.add_paragraph("График ликвидации академической задолженности:")
+        if header_found:
+            # Формируем основной текст уведомления
+            main_text = f"Администрация школы доводит до Вашего сведения, что учащийся {student.full_name} класса {student.class_name} по результатам промежуточной аттестации имеет:"
             
-            # Создаем таблицу для графика
-            table = doc.add_table(rows=1, cols=4)
-            table.style = 'Table Grid'
+            # Добавляем текст после заголовка
+            if header_index + 1 < len(doc.paragraphs):
+                # Если есть параграф после заголовка, используем его
+                main_paragraph = doc.paragraphs[header_index + 1]
+                main_paragraph.text = main_text
+            else:
+                # Если нет параграфа после заголовка, создаем новый
+                main_paragraph = doc.add_paragraph(main_text)
             
-            # Заголовки таблицы
-            hdr_cells = table.rows[0].cells
-            hdr_cells[0].text = "Предмет"
-            hdr_cells[1].text = "Тема"
-            hdr_cells[2].text = "Дата"
-            hdr_cells[3].text = "Время"
+            # Настраиваем форматирование: красная строка и выравнивание по ширине
+            main_paragraph.paragraph_format.first_line_indent = 708000  # ~0.5 дюйма
+            main_paragraph.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             
-            # Группируем консультации по предметам
-            consultations_by_subject = {}
-            for consultation in consultations:
-                subject_name = consultation['subject_name']
-                if subject_name not in consultations_by_subject:
-                    consultations_by_subject[subject_name] = []
+            # Продолжаем добавлять текст с академическими задолженностями
+            insertion_index = header_index + 2
+            
+            # Добавляем список предметов с неудовлетворительными оценками
+            if failed_subjects:
+                failed_subjects_text = ", ".join([s.name for s in failed_subjects])
                 
-                consultations_by_subject[subject_name].append(consultation)
+                if insertion_index < len(doc.paragraphs):
+                    doc.paragraphs[insertion_index].text = f"- неудовлетворительные отметки по предметам: {failed_subjects_text}"
+                    insertion_index += 1
+                else:
+                    p = doc.add_paragraph(f"- неудовлетворительные отметки по предметам: {failed_subjects_text}")
+                    insertion_index += 1
             
-            # Добавляем строки для каждого предмета
-            for subject_name, subject_consultations in consultations_by_subject.items():
-                for i, consultation in enumerate(subject_consultations):
-                    row_cells = table.add_row().cells
-                    
-                    # Для первой консультации предмета указываем название предмета
-                    if i == 0:
-                        row_cells[0].text = subject_name
+            # Для классов, кроме "А", также добавляем удовлетворительные оценки по углубленным предметам
+            if not is_class_a and satisfactory_subjects:
+                satisfactory_subjects_text = ", ".join([s.name for s in satisfactory_subjects])
+                
+                if insertion_index < len(doc.paragraphs):
+                    doc.paragraphs[insertion_index].text = f"- удовлетворительные отметки по предметам, изучаемым на углубленном уровне: {satisfactory_subjects_text}"
+                    insertion_index += 1
+                else:
+                    p = doc.add_paragraph(f"- удовлетворительные отметки по предметам, изучаемым на углубленном уровне: {satisfactory_subjects_text}")
+                    insertion_index += 1
+            
+            # Добавляем информацию о возможном переводе (для всех классов, кроме "А")
+            if not is_class_a and 'deadline_date' in meta:
+                deadline_date = meta['deadline_date']
+                # Преобразуем формат даты в дд.мм.гггг
+                try:
+                    date_parts = deadline_date.split('-')
+                    if len(date_parts) == 3:
+                        formatted_date = f"{date_parts[2]}.{date_parts[1]}.{date_parts[0]}"
                     else:
-                        row_cells[0].text = ""
+                        formatted_date = deadline_date
+                except:
+                    formatted_date = deadline_date
+                
+                deadline_text = f"В случае, если данные оценки не будут исправлены до {formatted_date}, то по решению Педагогического совета в соответствии с положением школы о классах с углубленным изучением отдельных предметов может быть осуществлен перевод в общеобразовательный класс."
+                
+                if insertion_index < len(doc.paragraphs):
+                    doc.paragraphs[insertion_index].text = deadline_text
+                    doc.paragraphs[insertion_index].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    insertion_index += 1
+                else:
+                    p = doc.add_paragraph(deadline_text)
+                    p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    insertion_index += 1
+            
+            # Добавляем график ликвидации задолженностей, если он есть
+            if consultations:
+                if insertion_index < len(doc.paragraphs):
+                    doc.paragraphs[insertion_index].text = "График ликвидации академической задолженности:"
+                    insertion_index += 1
+                else:
+                    p = doc.add_paragraph("График ликвидации академической задолженности:")
+                    insertion_index += 1
+                
+                # Создаем таблицу для графика
+                table = doc.add_table(rows=1, cols=4)
+                table.style = 'Table Grid'
+                
+                # Заголовки таблицы
+                hdr_cells = table.rows[0].cells
+                hdr_cells[0].text = "Предмет"
+                hdr_cells[1].text = "Тема"
+                hdr_cells[2].text = "Дата"
+                hdr_cells[3].text = "Время"
+                
+                # Группируем консультации по предметам
+                consultations_by_subject = {}
+                for consultation in consultations:
+                    subject_name = consultation['subject_name']
+                    if subject_name not in consultations_by_subject:
+                        consultations_by_subject[subject_name] = []
                     
-                    row_cells[1].text = consultation['topic_name'] or ""
-                    row_cells[2].text = consultation['date']
-                    row_cells[3].text = consultation['time']
-        
-        # Определяем учебный год
-        now = datetime.now()
-        if now.month >= 9:  # Если сейчас сентябрь или позже
-            academic_year = f"{now.year}-{now.year + 1}"
+                    consultations_by_subject[subject_name].append(consultation)
+                
+                # Добавляем строки для каждого предмета
+                for subject_name, subject_consultations in consultations_by_subject.items():
+                    for i, consultation in enumerate(subject_consultations):
+                        row_cells = table.add_row().cells
+                        
+                        # Для первой консультации предмета указываем название предмета
+                        if i == 0:
+                            row_cells[0].text = subject_name
+                        else:
+                            row_cells[0].text = ""
+                        
+                        row_cells[1].text = consultation['topic_name'] or ""
+                        
+                        # Преобразуем формат даты в дд.мм.гггг
+                        date_str = consultation['date']
+                        try:
+                            date_parts = date_str.split('-')
+                            if len(date_parts) == 3:
+                                formatted_date = f"{date_parts[2]}.{date_parts[1]}.{date_parts[0]}"
+                            else:
+                                formatted_date = date_str
+                        except:
+                            formatted_date = date_str
+                        
+                        row_cells[2].text = formatted_date
+                        row_cells[3].text = consultation['time']
         else:
-            academic_year = f"{now.year - 1}-{now.year}"
-        
-        # Заменяем плейсхолдер для учебного года, если он есть
-        for paragraph in doc.paragraphs:
-            if "2023-2024" in paragraph.text:
-                paragraph.text = paragraph.text.replace("2023-2024", academic_year)
+            # Если заголовок не найден, добавляем его и весь текст с нуля
+            # Но этого не должно происходить, если шаблон верный
+            return {'success': False, 'message': 'В шаблоне не найден заголовок "Уведомление"'}
         
         # Создаем директорию для сохранения результатов, если её нет
         output_dir = 'generated_documents'
         os.makedirs(output_dir, exist_ok=True)
         
         # Формируем имя файла
-        file_name = f"{student.full_name}_{student.class_name}_{notification_data['period']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
+        file_name = f"{student.full_name}_{student.class_name}_{notification_data['period']}_{current_time}.docx"
         file_path = os.path.join(output_dir, file_name)
         
         # Сохраняем документ
