@@ -183,3 +183,138 @@ function deleteStudent(studentId) {
 function createNotificationForStudent(studentId) {
     window.location.href = `/create_notification?student_id=${studentId}`;
 }
+// Обработчики для кнопок переключения вида
+const listViewBtn = document.getElementById('listView');
+const groupViewBtn = document.getElementById('groupView');
+
+if (listViewBtn && groupViewBtn) {
+    listViewBtn.addEventListener('click', function() {
+        this.classList.add('active');
+        groupViewBtn.classList.remove('active');
+        showListView();
+    });
+    
+    groupViewBtn.addEventListener('click', function() {
+        this.classList.add('active');
+        listViewBtn.classList.remove('active');
+        showGroupView();
+    });
+}
+
+// Функция для отображения простого списка
+function showListView() {
+    const tableContainer = document.querySelector('.table-responsive');
+    tableContainer.innerHTML = `
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>ФИО</th>
+                    <th>Класс</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="studentsTable">
+                <!-- Здесь будут ученики -->
+            </tbody>
+        </table>
+    `;
+    
+    // Загружаем всех учеников
+    fetch('/api/get_students')
+        .then(response => response.json())
+        .then(students => {
+            const tbody = document.getElementById('studentsTable');
+            students.forEach(student => {
+                tbody.appendChild(createStudentRow(student));
+            });
+        });
+}
+
+// Функция для отображения учеников по группам
+function showGroupView() {
+    const tableContainer = document.querySelector('.table-responsive');
+    tableContainer.innerHTML = '<div id="classGroups"></div>';
+    
+    // Загружаем классы
+    fetch('/api/get_unique_classes')
+        .then(response => response.json())
+        .then(classes => {
+            const container = document.getElementById('classGroups');
+            
+            // Для каждого класса создаем таблицу
+            classes.forEach(className => {
+                const classDiv = document.createElement('div');
+                classDiv.className = 'mb-4';
+                classDiv.innerHTML = `
+                    <h3 class="h5">${className}</h3>
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>ФИО</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="class-${className.replace(/\s+/g, '-')}">
+                            <!-- Здесь будут ученики класса -->
+                        </tbody>
+                    </table>
+                `;
+                container.appendChild(classDiv);
+                
+                // Загружаем учеников для класса
+                fetch(`/api/get_students_by_class/${encodeURIComponent(className)}`)
+                    .then(response => response.json())
+                    .then(students => {
+                        const tbody = document.getElementById(`class-${className.replace(/\s+/g, '-')}`);
+                        students.forEach(student => {
+                            tbody.appendChild(createStudentRowNoClass(student));
+                        });
+                    });
+            });
+        });
+}
+
+// Функция для создания строки таблицы ученика (с классом)
+function createStudentRow(student) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${student.id}</td>
+        <td>${student.full_name}</td>
+        <td>${student.class_name}</td>
+        <td>
+            <button class="btn btn-sm btn-info" onclick="editStudent(${student.id})">
+                <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="deleteStudent(${student.id})">
+                <i class="bi bi-trash"></i>
+            </button>
+            <button class="btn btn-sm btn-success" onclick="createNotificationForStudent(${student.id})">
+                <i class="bi bi-file-earmark-text"></i>
+            </button>
+        </td>
+    `;
+    return tr;
+}
+
+// Функция для создания строки таблицы ученика (без класса)
+function createStudentRowNoClass(student) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${student.id}</td>
+        <td>${student.full_name}</td>
+        <td>
+            <button class="btn btn-sm btn-info" onclick="editStudent(${student.id})">
+                <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="deleteStudent(${student.id})">
+                <i class="bi bi-trash"></i>
+            </button>
+            <button class="btn btn-sm btn-success" onclick="createNotificationForStudent(${student.id})">
+                <i class="bi bi-file-earmark-text"></i>
+            </button>
+        </td>
+    `;
+    return tr;
+}

@@ -85,7 +85,7 @@ def generate_document(notification_id):
         
         if header_found:
             # Формируем основной текст уведомления
-            main_text = f"Администрация школы доводит до Вашего сведения, что учащийся {student.full_name} класса {student.class_name} по результатам промежуточной аттестации имеет:"
+            main_text = f"Администрация школы доводит до Вашего сведения, что учащийся {student.class_name} класса {student.full_name} по результатам промежуточной аттестации имеет:"
             
             # Добавляем текст после заголовка
             if header_index + 1 < len(doc.paragraphs):
@@ -97,7 +97,7 @@ def generate_document(notification_id):
                 main_paragraph = doc.add_paragraph(main_text)
             
             # Настраиваем форматирование: красная строка и выравнивание по ширине
-            main_paragraph.paragraph_format.first_line_indent = 708000  # ~0.5 дюйма
+            main_paragraph.paragraph_format.first_line_indent = Pt(1.25)  # Исправленный размер отступа
             main_paragraph.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             
             # Продолжаем добавлять текст с академическими задолженностями
@@ -105,7 +105,7 @@ def generate_document(notification_id):
             
             # Добавляем список предметов с неудовлетворительными оценками
             if failed_subjects:
-                failed_subjects_text = ", ".join([s.name for s in failed_subjects])
+                failed_subjects_text = "; ".join([s.name for s in failed_subjects])  # Используем точку с запятой
                 
                 if insertion_index < len(doc.paragraphs):
                     doc.paragraphs[insertion_index].text = f"- неудовлетворительные отметки по предметам: {failed_subjects_text}"
@@ -116,7 +116,7 @@ def generate_document(notification_id):
             
             # Для классов, кроме "А", также добавляем удовлетворительные оценки по углубленным предметам
             if not is_class_a and satisfactory_subjects:
-                satisfactory_subjects_text = ", ".join([s.name for s in satisfactory_subjects])
+                satisfactory_subjects_text = "; ".join([s.name for s in satisfactory_subjects])  # Используем точку с запятой
                 
                 if insertion_index < len(doc.paragraphs):
                     doc.paragraphs[insertion_index].text = f"- удовлетворительные отметки по предметам, изучаемым на углубленном уровне: {satisfactory_subjects_text}"
@@ -140,23 +140,17 @@ def generate_document(notification_id):
                 
                 deadline_text = f"В случае, если данные оценки не будут исправлены до {formatted_date}, то по решению Педагогического совета в соответствии с положением школы о классах с углубленным изучением отдельных предметов может быть осуществлен перевод в общеобразовательный класс."
                 
-                if insertion_index < len(doc.paragraphs):
-                    doc.paragraphs[insertion_index].text = deadline_text
-                    doc.paragraphs[insertion_index].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                    insertion_index += 1
-                else:
-                    p = doc.add_paragraph(deadline_text)
-                    p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                    insertion_index += 1
+                # Создаем новый параграф с правильным форматированием
+                p = doc.add_paragraph(deadline_text)
+                p.paragraph_format.first_line_indent = Pt(1.25)  # Добавляем красную строку
+                p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                insertion_index += 1
             
             # Добавляем график ликвидации задолженностей, если он есть
             if consultations:
-                if insertion_index < len(doc.paragraphs):
-                    doc.paragraphs[insertion_index].text = "График ликвидации академической задолженности:"
-                    insertion_index += 1
-                else:
-                    p = doc.add_paragraph("График ликвидации академической задолженности:")
-                    insertion_index += 1
+                # Создаем параграф для заголовка графика
+                p = doc.add_paragraph("График ликвидации академической задолженности:")
+                insertion_index += 1
                 
                 # Создаем таблицу для графика
                 table = doc.add_table(rows=1, cols=4)
@@ -204,6 +198,29 @@ def generate_document(notification_id):
                         
                         row_cells[2].text = formatted_date
                         row_cells[3].text = consultation['time']
+                
+                # Добавляем пустую строку после таблицы
+                doc.add_paragraph("")
+            
+            # Добавляем запись "Зам. директора" и подпись
+            p = doc.add_paragraph("Зам. директора")
+            p.add_tab()
+            p.add_tab()
+            p.add_run("Филиппова Н.А.")
+            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            
+            # Добавляем "Ознакомлены:"
+            p = doc.add_paragraph("\nОзнакомлены:")
+            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            
+            # Добавляем строку для подписи родителя
+            p = doc.add_paragraph("_______________________________")
+            p.add_run("(Ф.И.О. родителя, законного представителя)")
+            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Добавляем "Кл. руководитель"
+            p = doc.add_paragraph("Кл. руководитель")
+            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
         else:
             # Если заголовок не найден, добавляем его и весь текст с нуля
             # Но этого не должно происходить, если шаблон верный

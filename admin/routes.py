@@ -41,11 +41,23 @@ def subjects():
 def class_profiles():
     """Страница управления профильными предметами по классам"""
     session = get_session()
+    # Получаем список всех классов
+    classes = get_unique_classes_sorted()
     profiles = session.query(ClassProfile).all()
     subjects = session.query(Subject).all()
-    # Здесь может потребоваться дополнительная логика для обработки данных
     session.close()
-    return render_template('admin/class_profiles.html', profiles=profiles, subjects=subjects)
+    
+    # Создаем словарь профилей для JavaScript
+    profiles_by_class = {}
+    for profile in profiles:
+        if profile.class_name not in profiles_by_class:
+            profiles_by_class[profile.class_name] = []
+        profiles_by_class[profile.class_name].append(profile.subject_id)
+    
+    return render_template('admin/class_profiles.html', 
+                          profiles=profiles_by_class, 
+                          subjects=subjects, 
+                          classes=classes)
 
 @admin_bp.route('/update_class_profile', methods=['POST'])
 @admin_required
@@ -192,5 +204,39 @@ def delete_student(student_id):
     except Exception as e:
         session.rollback()
         return jsonify({'success': False, 'message': f'Ошибка при удалении ученика: {str(e)}'})
+    finally:
+        session.close()
+
+
+@admin_bp.route('/delete_all_students', methods=['POST'])
+@admin_required
+def delete_all_students():
+    """Удаление всех учеников"""
+    session = get_session()
+    
+    try:
+        # Удаляем все уведомления и связанные с ними записи
+        from database.models import Notification, NotificationSubject, NotificationMeta, NotificationConsultation
+        
+        # Удаляем связанные записи консультаций
+        session.query(NotificationConsultation).delete()
+        
+        # Удаляем связанные записи метаданных
+        session.query(NotificationMeta).delete()
+        
+        # Удаляем связанные записи предметов уведомлений
+        session.query(NotificationSubject).delete()
+        
+        # Удаляем уведомления
+        session.query(Notification).delete()
+        
+        # Удаляем учеников
+        session.query(Student).delete()
+        
+        session.commit()
+        return jsonify({'success': True, 'message': 'Все ученики успешно удалены'})
+    except Exception as e:
+        session.rollback()
+        return jsonify({'success': False, 'message': f'Ошибка при удалении учеников: {str(e)}'})
     finally:
         session.close()

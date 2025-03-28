@@ -145,7 +145,23 @@
             </div>
         </div>
     </div>
-    
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Список учеников</h5>
+            <div class="d-flex">
+                <div class="input-group me-2" style="width: 300px;">
+                    <input type="text" class="form-control" id="searchStudent" placeholder="Поиск по ФИО или классу">
+                    <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <button type="button" class="btn btn-danger" id="deleteAllStudents">
+                    <i class="bi bi-trash"></i> Удалить всех учеников
+                </button>
+            </div>
+        </div>
+        <!-- ... -->
+    </div>
     <!-- Модальное окно для редактирования ученика -->
     <div class="modal fade" id="editStudentModal" tabindex="-1" aria-labelledby="editStudentModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -197,5 +213,34 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/students.js') }}"></script>
+    <script>
+    // Обработчик для кнопки удаления всех учеников
+const deleteAllStudentsBtn = document.getElementById('deleteAllStudents');
+if (deleteAllStudentsBtn) {
+    deleteAllStudentsBtn.addEventListener('click', function() {
+        if (confirm('Вы уверены, что хотите удалить ВСЕХ учеников? Это действие нельзя отменить!')) {
+            fetch('/admin/delete_all_students', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Успешно', data.message, 'success');
+                    
+                    // Перезагружаем страницу для обновления списка
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast('Ошибка', data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Ошибка', 'Произошла ошибка при выполнении запроса', 'error');
+            });
+        }
+    });
+}
+</script>
 </body>
 </html>

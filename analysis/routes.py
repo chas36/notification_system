@@ -16,7 +16,9 @@ os.makedirs('temp', exist_ok=True)
 @analysis_bp.route('/')
 def index():
     """Главная страница модуля анализа"""
-    return render_template('analysis/index.html')
+    # Получаем список классов
+    classes = get_unique_classes_sorted()
+    return render_template('analysis/index.html', classes=classes)
 
 @analysis_bp.route('/upload', methods=['POST'])
 def upload_files():
@@ -106,8 +108,13 @@ def analyze(session_id):
                 'type': item['Тип проблемы']
             })
         
+        # Получаем список всех учеников данного класса
+        all_students = get_students_by_class_sorted(class_name)
+        
         return render_template('analysis/results.html', 
-                            students=students, 
+                            students=students,
+                            all_students=all_students,
+                            class_name=class_name,
                             session_id=session_id)
     
     except Exception as e:
@@ -135,6 +142,61 @@ def download_results(session_id):
     save_results_to_csv(results, output_path)
     
     return send_file(output_path, as_attachment=True, download_name='students_with_problems.csv')
+
+@analysis_bp.route('/get_student_data/<student_name>/<session_id>')
+def get_student_data(student_name, session_id):
+    """Получение данных ученика для предзаполнения формы уведомления"""
+    if 'analysis_session_id' not in session or session['analysis_session_id'] != session_id:
+        return jsonify({'success': False, 'message': 'Сессия анализа не найдена или истекла'})
+    
+    if 'analysis_results' not in session:
+        return jsonify({'success': False, 'message': 'Результаты анализа не найдены'})
+    
+    # Получаем данные из сессии
+    results = json.loads(session['analysis_results'])
+    
+    # Фильтруем результаты для указанного ученика
+    student_results = [r for r in results if r['ФИО ученика'] == student_name]
+    
+    if not student_results:
+        return jsonify({'success': False, 'message': 'Не найдено результатов для указанного ученика'})
+    
+    # Получаем класс ученика из результатов
+    student_class = student_results[0].get('Класс', '')
+    
+    # Получаем ученика из базы данных или создаем нового
+    db_session = get_session()
+    student = get_student_by_name(student_name)
+    
+    if not student:
+        # Если ученика нет, добавляем его
+        student_id = add_student(student_name, student_class)
+    else:
+        student_id = student.id
+    
+    # Получаем список предметов с задолженностями и тройками
+    failed_subjects = []
+    satisfactory_subjects = []
+    
+    for result in student_results:
+        subject_name = result['Предмет']
+        problem_type = result['Тип проблемы']
+        
+        if problem_type == 'Задолженность':
+            failed_subjects.append(subject_name)
+        elif problem_type == 'Тройка':
+            satisfactory_subjects.append(subject_name)
+    
+    db_session.close()
+    
+    return jsonify({
+        'success': True,
+        'student_id': student_id,
+        'student_name': student_name,
+        'student_class': student_class,
+        'failed_subjects': failed_subjects,
+        'satisfactory_subjects': satisfactory_subjects
+    })
 
 @analysis_bp.route('/create_notification/<session_id>', methods=['POST'])
 def create_notification_from_analysis(session_id):
