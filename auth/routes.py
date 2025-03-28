@@ -84,10 +84,3 @@ def admin_required(func):
         return func(*args, **kwargs)
     decorated_view.__name__ = func.__name__
     return decorated_view
-
-@admin_bp.route('/')
-@admin_required@admin_required
-def dashboard():
-    """Административная панель"""
-    # Важно! Рендерим только шаблон dashboard, без других шаблонов
-    return render_template('admin/dashboard.html')
