@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from .models import Base, Student, Subject, TemplateType, Notification, NotificationSubject, DeadlineDate
+from database.all_models import *  # This loads all models
 import os
 
 DATABASE_URL = 'sqlite:///notification_system.db'
@@ -11,13 +12,16 @@ def get_engine():
 
 def init_db():
     """Инициализируем базу данных"""
+    # Import User model to ensure it's registered with Base
+    from auth.models import User
+    
     engine = get_engine()
     Base.metadata.create_all(engine)
     
-    # Создаем сессию
+    # Rest of the function remains the same
     Session = sessionmaker(bind=engine)
     session = Session()
-    
+
     # Добавляем стандартные предметы, если их еще нет
     standard_subjects = ["Математика", "Русский язык", "Литература", "Физика", 
                          "Химия", "Биология", "История", "Обществознание",
@@ -399,3 +403,9 @@ def get_subject_by_name(subject_name):
     session.close()
     
     return subject_id
+def get_student_by_name(student_name):
+    """Получает ученика по ФИО"""
+    session = get_session()
+    student = session.query(Student).filter_by(full_name=student_name).first()
+    session.close()
+    return student

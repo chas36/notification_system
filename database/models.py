@@ -118,3 +118,15 @@ class NotificationConsultation(Base):
     
     def __repr__(self):
         return f"<NotificationConsultation(notification_id={self.notification_id}, subject_id={self.subject_id}, date='{self.date}')>"
+    
+class ClassProfile(Base):
+    __tablename__ = 'class_profiles'
+    
+    id = Column(Integer, primary_key=True)
+    class_name = Column(String, nullable=False)
+    subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=False)
+    
+    subject = relationship("Subject")
+    
+    def __repr__(self):
+        return f"<ClassProfile(class_name='{self.class_name}', subject_id={self.subject_id})>"
