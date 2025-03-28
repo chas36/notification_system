@@ -36,7 +36,7 @@ def login():
     if current_user.is_authenticated:
         if current_user.is_admin:
             return redirect(url_for('admin.dashboard'))
-        return redirect(url_for('main.index'))
+        return redirect(url_for('create_notification'))
     
     if request.method == 'POST':
         username = request.form.get('username')
@@ -52,18 +52,21 @@ def login():
             
             # Перенаправление после входа
             next_page = request.args.get('next')
-            if not next_page or next_page.startswith('/'):
+            if not next_page or not next_page.startswith('/'):
                 if user.is_admin:
+                    # Перенаправляем админа на панель управления
                     next_page = url_for('admin.dashboard')
                 else:
-                    next_page = url_for('main.index')
+                    # Обычных пользователей - на страницу создания уведомлений
+                    next_page = url_for('create_notification')
+            
             return redirect(next_page)
         
         session.close()
         flash('Неверное имя пользователя или пароль', 'danger')
     
+    # Важно! Только рендерим страницу входа, без других шаблонов
     return render_template('auth/login.html')
-
 @auth_bp.route('/logout')
 @login_required
 def logout():
@@ -81,3 +84,10 @@ def admin_required(func):
         return func(*args, **kwargs)
     decorated_view.__name__ = func.__name__
     return decorated_view
+
+@admin_bp.route('/')
+@admin_required@admin_required
+def dashboard():
+    """Административная панель"""
+    # Важно! Рендерим только шаблон dashboard, без других шаблонов
+    return render_template('admin/dashboard.html')

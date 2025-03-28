@@ -307,7 +307,7 @@ def get_unique_classes_sorted():
     
     return sorted_classes
     
-    return sorted_classes
+    
 def get_students_by_class_sorted(class_name):
     """Получает список учеников определенного класса, отсортированных по ФИО"""
     session = get_session()

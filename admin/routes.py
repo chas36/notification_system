@@ -1,155 +1,85 @@
-# admin/routes.py
-from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
-from auth.routes import admin_required
-from database.db import get_session, get_all_students_sorted, add_student, get_unique_classes_sorted
-from database.models import Student, Subject
-from werkzeug.utils import secure_filename
-import os
-from utils.import_export import import_students_from_excel
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from .models import User
+from database.db import get_session
 
-admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+auth_bp = Blueprint('auth', __name__)
 
-@admin_bp.route('/')
-@admin_required
-def dashboard():
-    """Административная панель"""
-    return render_template('admin/dashboard.html')
+login_manager = LoginManager()
+login_manager.login_view = 'auth.login'
 
-@admin_bp.route('/students')
-@admin_required
-def students():
-    """Управление учениками"""
-    all_students = get_all_students_sorted()
-    return render_template('admin/students.html', students=all_students)
-
-@admin_bp.route('/add_student', methods=['POST'])
-@admin_required
-def add_new_student():
-    """Добавление нового ученика"""
-    full_name = request.form.get('full_name')
-    class_name = request.form.get('class_name')
-    
-    if not full_name or not class_name:
-        return jsonify({'success': False, 'message': 'Необходимо указать ФИО и класс'})
-    
-    student_id = add_student(full_name, class_name)
-    return jsonify({'success': True, 'message': 'Ученик успешно добавлен', 'student_id': student_id})
-
-@admin_bp.route('/import_students_excel', methods=['POST'])
-@admin_required
-def import_from_excel():
-    """Импорт учеников из Excel-файла"""
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'message': 'Файл не выбран'})
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'success': False, 'message': 'Файл не выбран'})
-    
-    if file:
-        filename = secure_filename(file.filename)
-        file_path = os.path.join('uploads', filename)
-        
-        # Создаем директорию, если не существует
-        os.makedirs('uploads', exist_ok=True)
-        
-        file.save(file_path)
-        
-        result = import_students_from_excel(file_path)
-        
-        # Удаляем временный файл
-        os.remove(file_path)
-        
-        return jsonify(result)
-
-@admin_bp.route('/subjects')
-@admin_required
-def subjects():
-    """Управление предметами"""
+@login_manager.user_loader
+def load_user(user_id):
     session = get_session()
-    all_subjects = session.query(Subject).order_by(Subject.name).all()
+    user = session.query(User).get(int(user_id))
     session.close()
-    
-    return render_template('admin/subjects.html', subjects=all_subjects)
+    return user
 
-@admin_bp.route('/add_subject', methods=['POST'])
-@admin_required
-def add_subject():
-    """Добавление нового предмета"""
-    name = request.form.get('name')
-    if not name:
-        return jsonify({'success': False, 'message': 'Необходимо указать название предмета'})
+def init_auth(app):
+    login_manager.init_app(app)
+    app.register_blueprint(auth_bp)
     
-    session = get_session()
-    
-    # Проверяем существование предмета
-    existing = session.query(Subject).filter_by(name=name).first()
-    if existing:
+    # Создание начального администратора, если его нет
+    with app.app_context():
+        session = get_session()
+        admin = session.query(User).filter_by(username='admin').first()
+        if not admin:
+            admin = User(username='admin', is_admin=True)
+            admin.set_password('password')  # Пароль для первичного входа
+            session.add(admin)
+            session.commit()
         session.close()
-        return jsonify({'success': False, 'message': 'Предмет с таким названием уже существует'})
-    
-    # Добавляем новый предмет
-    new_subject = Subject(name=name)
-    session.add(new_subject)
-    session.commit()
-    subject_id = new_subject.id
-    session.close()
-    
-    return jsonify({'success': True, 'message': 'Предмет успешно добавлен', 'subject_id': subject_id})
 
-@admin_bp.route('/class_profiles')
-@admin_required
-def class_profiles():
-    """Управление профильными предметами по классам"""
-    classes = get_unique_classes_sorted()
+@auth_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    # Если пользователь уже авторизован, перенаправляем его
+    if current_user.is_authenticated:
+        if current_user.is_admin:
+            return redirect(url_for('admin.dashboard'))
+        return redirect(url_for('create_notification'))
     
-    session = get_session()
-    all_subjects = session.query(Subject).order_by(Subject.name).all()
-    
-    # Получаем существующие профильные предметы для классов
-    from database.models import ClassProfile
-    profiles = {}
-    
-    class_profiles = session.query(ClassProfile).all()
-    for profile in class_profiles:
-        if profile.class_name not in profiles:
-            profiles[profile.class_name] = []
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = 'remember' in request.form
         
-        profiles[profile.class_name].append(profile.subject_id)
+        session = get_session()
+        user = session.query(User).filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user, remember=remember)
+            session.close()
+            
+            # Перенаправление после входа
+            next_page = request.args.get('next')
+            if not next_page or not next_page.startswith('/'):
+                if user.is_admin:
+                    next_page = url_for('admin.dashboard')
+                else:
+                    next_page = url_for('create_notification')
+            return redirect(next_page)
+        
+        session.close()
+        flash('Неверное имя пользователя или пароль', 'danger')
     
-    session.close()
-    
-    return render_template('admin/class_profiles.html', 
-                          classes=classes, 
-                          subjects=all_subjects,
-                          profiles=profiles)
+    return render_template('auth/login.html')
 
-@admin_bp.route('/update_class_profile', methods=['POST'])
-@admin_required
-def update_class_profile():
-    """Обновление профильных предметов для класса"""
-    class_name = request.form.get('class_name')
-    subject_ids = request.form.getlist('subject_ids[]')
-    
-    if not class_name:
-        return jsonify({'success': False, 'message': 'Необходимо указать класс'})
-    
-    session = get_session()
-    
-    # Удаляем существующие записи для класса
-    from database.models import ClassProfile
-    session.query(ClassProfile).filter_by(class_name=class_name).delete()
-    
-    # Добавляем новые записи
-    for subject_id in subject_ids:
-        profile = ClassProfile(class_name=class_name, subject_id=int(subject_id))
-        session.add(profile)
-    
-    session.commit()
-    session.close()
-    
-    return jsonify({'success': True, 'message': f'Профильные предметы для класса {class_name} обновлены'})
+@auth_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    # Очищаем сессию при выходе
+    session.clear()
+    flash('Вы успешно вышли из системы', 'success')
+    return redirect(url_for('auth.login'))
 
-# Регистрация Blueprint
-def init_admin(app):
-    app.register_blueprint(admin_bp)
+# Функция для проверки прав администратора
+def admin_required(func):
+    @login_required
+    def decorated_view(*args, **kwargs):
+        if not current_user.is_admin:
+            flash('Доступ запрещен. Требуются права администратора.', 'danger')
+            return redirect(url_for('create_notification'))
+        return func(*args, **kwargs)
+    decorated_view.__name__ = func.__name__
+    return decorated_view

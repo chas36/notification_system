@@ -1,0 +1,120 @@
+<!-- templates/admin/dashboard.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель администратора | Система уведомлений</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('admin.dashboard') }}">Система уведомлений - Администратор</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('admin.dashboard') }}">Панель управления</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin.students') }}">Ученики</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin.subjects') }}">Предметы</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin.class_profiles') }}">Профильные предметы</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('create_notification') }}">
+                            <i class="bi bi-file-earmark-text"></i> Создать уведомление
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('auth.logout') }}">
+                            <i class="bi bi-box-arrow-right"></i> Выйти
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>Панель администратора</h1>
+        
+        <div class="row mt-4">
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title">Управление учениками</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">Добавление, редактирование и удаление учеников. Импорт списка учеников из Excel-файла.</p>
+                        <a href="{{ url_for('admin.students') }}" class="btn btn-primary">
+                            <i class="bi bi-people"></i> Управление учениками
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title">Управление предметами</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">Добавление и редактирование списка предметов в системе.</p>
+                        <a href="{{ url_for('admin.subjects') }}" class="btn btn-primary">
+                            <i class="bi bi-book"></i> Управление предметами
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title">Профильные предметы по классам</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">Настройка профильных предметов для каждого класса. Эти предметы используются при анализе успеваемости.</p>
+                        <a href="{{ url_for('admin.class_profiles') }}" class="btn btn-primary">
+                            <i class="bi bi-diagram-3"></i> Настроить профильные предметы
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title">Создание уведомлений</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">Перейти к форме создания уведомлений об академической задолженности.</p>
+                        <a href="{{ url_for('create_notification') }}" class="btn btn-success">
+                            <i class="bi bi-file-earmark-text"></i> Создать уведомление
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-light py-3 mt-4">
+        <div class="container">
+            <p class="text-center text-muted">© 2025 Система уведомлений об академической задолженности</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

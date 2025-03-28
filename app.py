@@ -1,9 +1,10 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, session, flash
 import os
 from werkzeug.utils import secure_filename
 from database.db import init_db
 from flask_session import Session
+from flask_login import current_user, login_required  # Добавьте эту строку
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -35,14 +36,9 @@ init_admin(app)
 # Инициализируем модуль анализа
 from analysis.routes import init_analysis
 init_analysis(app)
-
 @app.route('/')
 def index():
-    """Главная страница - для обычных пользователей сразу перенаправляет на создание уведомления"""
-    from flask_login import current_user
-    
-    if current_user.is_authenticated and current_user.is_admin:
-        return redirect(url_for('admin.dashboard'))
+    """Главная страница - для всех пользователей направляет на страницу создания уведомления"""
     return redirect(url_for('create_notification'))
 
 @app.route('/create_notification')
@@ -248,6 +244,28 @@ def api_get_subjects_by_grade(grade):
     if grade in subjects_by_grade:
         return jsonify(subjects_by_grade[grade])
     return jsonify([])
+
+@app.route('/students')
+@login_required
+def students_route():
+    """Страница управления учениками доступна только авторизованным пользователям"""
+    if current_user.is_admin:
+        return redirect(url_for('admin.students'))
+    else:
+        flash('Доступ запрещен. Требуются права администратора.', 'danger')
+        return redirect(url_for('create_notification'))
+
+@app.route('/import_debts')
+@login_required
+def import_debts_route():
+    """Страница импорта задолженностей доступна только авторизованным пользователям"""
+    if current_user.is_admin:
+        from database.db import get_all_template_types
+        template_types = get_all_template_types()
+        return render_template('import_debts.html', template_types=template_types)
+    else:
+        flash('Доступ запрещен. Требуются права администратора.', 'danger')
+        return redirect(url_for('create_notification'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
