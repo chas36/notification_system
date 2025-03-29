@@ -26,6 +26,7 @@ notification_system/
 ├── utils/                # Вспомогательные утилиты
 ├── app.py                # Основной файл приложения
 ├── requirements.txt      # Зависимости проекта
+├── .env.example          # Пример файла с переменными окружения
 └── __init__.py           # Инициализация пакета
 ```
 
@@ -58,10 +59,11 @@ pip install -r requirements.txt
 
 4. Настроить переменные окружения:
 ```bash
-# Создайте файл .env в корне проекта со следующим содержимым:
-FLASK_APP=app.py
-FLASK_ENV=development
-SECRET_KEY=your_secret_key_here
+# Скопировать пример файла .env.example и переименовать его в .env
+cp .env.example .env  # для Linux/MacOS
+copy .env.example .env  # для Windows
+
+# Затем отредактировать .env и указать свои значения
 ```
 
 5. Инициализировать базу данных:
@@ -125,6 +127,14 @@ GET /api/get_subjects_by_grade/{grade}
 - `notification_consultations` - консультации по предметам
 - `class_profiles` - профили классов (связь классов и предметов)
 
+## Вклад в проект
+
+1. Форкните репозиторий
+2. Создайте ветку для вашей функции (`git checkout -b feature/amazing-feature`)
+3. Зафиксируйте ваши изменения (`git commit -m 'Add some amazing feature'`)
+4. Отправьте ветку (`git push origin feature/amazing-feature`)
+5. Откройте Pull Request
+
 ## Лицензия
 
-© 2025
+© 2025 
