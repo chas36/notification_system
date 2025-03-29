@@ -1,14 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from .models import Base, Student, Subject, TemplateType, Notification, NotificationSubject, DeadlineDate
-from database.all_models import *  # This loads all models
+from config import get_config
 import os
-
-DATABASE_URL = 'sqlite:///notification_system.db'
 
 def get_engine():
     """Создаем подключение к базе данных"""
-    return create_engine(DATABASE_URL)
+    config = get_config()
+    return create_engine(config.DATABASE_URI)
 
 def init_db():
     """Инициализируем базу данных"""
