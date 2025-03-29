@@ -127,4 +127,4 @@ GET /api/get_subjects_by_grade/{grade}
 
 ## Лицензия
 
-© 2025 
+© 2025
