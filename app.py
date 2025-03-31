@@ -7,60 +7,49 @@ from flask_session import Session
 from flask_login import current_user, login_required
 from config import get_config
 
-def create_app(config_class=None):
-    """Factory pattern для создания приложения"""
-    app = Flask(__name__)
-    
-    # Загрузка конфигурации
-    if config_class is None:
-        config_class = get_config()
-    app.config.from_object(config_class)
-    
-    # Создаем необходимые директории
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['GENERATED_DOCUMENTS_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['TEMP_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['SESSION_FILE_DIR'], exist_ok=True)
-    
-    # Инициализируем сессии
-    Session(app)
-    
-    # Инициализируем базу данных
-    init_db()
-    
-    # Инициализируем аутентификацию
-    from auth.routes import init_auth
-    init_auth(app)
-    
-    # Инициализируем административную часть
-    from admin.routes import init_admin
-    init_admin(app)
-    
-    # Инициализируем модуль анализа
-    from analysis.routes import init_analysis
-    init_analysis(app)
-    
-    # Регистрируем маршруты
-    register_routes(app)
-    
-    return app
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 МБ максимальный размер файла
+app.config['SECRET_KEY'] = 'your-secret-key-here'  # Для Flask-Login и сессий
 
-def register_routes(app):
-    """Register the routes for the main application"""
-    
-    @app.route('/')
-    def index():
-        """Главная страница - для всех пользователей направляет на страницу создания уведомления"""
-        return redirect(url_for('create_notification'))
+# Настройка сессий на основе файловой системы для хранения больших данных анализа
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = 'flask_session'
+Session(app)
 
-    @app.route('/create_notification')
-    def create_notification():
-        """Страница создания уведомления"""
-        from database.db import get_all_template_types
-        template_types = get_all_template_types()
-        
-        return render_template('create_notification.html', 
-                            template_types=template_types)
+# Создаем необходимые директории
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs('generated_documents', exist_ok=True)
+os.makedirs('temp', exist_ok=True)
+os.makedirs('flask_session', exist_ok=True)
+
+# Инициализируем базу данных
+init_db()
+
+# Инициализируем аутентификацию
+from auth.routes import init_auth
+init_auth(app)
+
+# Инициализируем административную часть
+from admin.routes import init_admin
+init_admin(app)
+
+# Инициализируем модуль анализа
+from analysis.routes import init_analysis
+init_analysis(app)
+@app.route('/')
+def index():
+    """Главная страница - для всех пользователей направляет на страницу создания уведомления"""
+    return redirect(url_for('create_notification'))
+
+@app.route('/create_notification')
+def create_notification():
+    """Страница создания уведомления"""
+    from database.db import get_all_template_types
+    template_types = get_all_template_types()
+    
+    return render_template('create_notification.html', 
+                           template_types=template_types)
 
     @app.route('/submit_notification', methods=['POST'])
     def submit_notification():

@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from auth.models import User
-from database.db import get_session, get_student_by_id, add_student
+from database.db import get_session, get_student_by_id, add_student, get_unique_classes_sorted
 from database.models import Subject, ClassProfile, Student
 from auth.routes import admin_required
 

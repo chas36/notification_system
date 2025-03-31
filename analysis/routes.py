@@ -5,7 +5,7 @@ import os
 import json
 import pandas as pd
 from utils.excel_analyzer import analyze_excel_files, save_results_to_csv
-from database.db import get_session, get_student_by_name, add_student, get_subject_by_name, create_notification
+from database.db import get_session, get_student_by_name, add_student, get_subject_by_name, create_notification, get_unique_classes_sorted
 
 analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 
@@ -54,6 +54,12 @@ def upload_files():
     # Сохраняем класс в сессии для дальнейшего использования
     session['analysis_class_name'] = class_name
     
+    # Выполняем анализ сразу здесь для ускорения процесса
+    results = analyze_excel_files(folder_path, class_name)
+    
+    # Сохраняем результаты в сессии
+    session['analysis_results'] = json.dumps(results)
+    
     return jsonify({
         'success': True, 
         'message': f'Загружено {len(file_paths)} файлов', 
@@ -61,6 +67,66 @@ def upload_files():
         'redirect': url_for('analysis.analyze', session_id=session_id)
     })
 
+@analysis_bp.route('/analyze/<session_id>')
+def analyze(session_id):
+    """Анализ загруженных файлов"""
+    if 'analysis_session_id' not in session or session['analysis_session_id'] != session_id:
+        flash('Сессия анализа не найдена или истекла', 'danger')
+        return redirect(url_for('analysis.index'))
+    
+    # Получаем класс из сессии
+    class_name = session.get('analysis_class_name', '')
+    
+    # Путь к папке с файлами
+    folder_path = os.path.join('uploads', 'excel_files', session_id)
+    
+    if not os.path.exists(folder_path):
+        flash('Файлы не найдены', 'danger')
+        return redirect(url_for('analysis.index'))
+    
+    # Анализируем файлы или получаем результаты из сессии
+    try:
+        if 'analysis_results' in session:
+            results = json.loads(session['analysis_results'])
+        else:
+            results = analyze_excel_files(folder_path, class_name)
+            session['analysis_results'] = json.dumps(results)
+        
+        if not results:
+            flash('Не найдено проблем с успеваемостью в загруженных файлах', 'info')
+            return render_template('analysis/no_results.html')
+        
+        # Получаем полный список учеников этого класса
+        all_students = get_students_by_class_sorted(class_name) if class_name else []
+        
+        # Группируем результаты по ученикам для удобного отображения
+        students = {}
+        for item in results:
+            student_name = item['ФИО ученика']
+            if student_name not in students:
+                students[student_name] = {
+                    'name': student_name,
+                    'class': item.get('Класс', class_name),
+                    'problems': []
+                }
+            
+            students[student_name]['problems'].append({
+                'subject': item['Предмет'],
+                'period': item['Период промежуточной аттестации'],
+                'date': item['Дата промежуточной аттестации'],
+                'grade': item['Итоговая отметка'],
+                'type': item['Тип проблемы']
+            })
+        
+        return render_template('analysis/results.html', 
+                              students=students, 
+                              all_students=all_students,
+                              session_id=session_id)
+    
+    except Exception as e:
+        flash(f'Ошибка при анализе файлов: {str(e)}', 'danger')
+        return redirect(url_for('analysis.index'))
+    
 @analysis_bp.route('/analyze/<session_id>')
 def analyze(session_id):
     """Анализ загруженных файлов"""

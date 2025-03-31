@@ -1,0 +1,18 @@
+<!-- templates/base.html (фрагмент) -->
+<ul class="navbar-nav me-auto">
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}">Панель управления</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'admin.students' %}active{% endif %}" href="{{ url_for('admin.students') }}">Ученики</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'admin.subjects' %}active{% endif %}" href="{{ url_for('admin.subjects') }}">Предметы</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'admin.class_profiles' %}active{% endif %}" href="{{ url_for('admin.class_profiles') }}">Профильные предметы</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'analysis.index' %}active{% endif %}" href="{{ url_for('analysis.index') }}">Анализ успеваемости</a>
+    </li>
+</ul>

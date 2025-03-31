@@ -17,13 +17,14 @@
         
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="mb-3">
-                <label for="classSelect" class="form-label">Класс</label>
-                <select class="form-select" id="classSelect" name="class_name" required>
-                    <option value="">Выберите класс</option>
+                <label for="classInput" class="form-label">Класс</label>
+                <select class="form-select" id="classInput" name="class_name">
+                    <option value="">Все классы</option>
                     {% for class_name in classes %}
-                    <option value="{{ class_name }}">{{ class_name }}</option>
+                        <option value="{{ class_name }}">{{ class_name }}</option>
                     {% endfor %}
                 </select>
+                <div class="form-text">Если указан класс, будут учитываться только профильные предметы для данного класса</div>
             </div>
             
             <div class="mb-3">
