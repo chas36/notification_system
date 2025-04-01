@@ -667,3 +667,79 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+// Добавьте в конец файла notification_form_simple.js
+
+// Функция для предзаполнения формы данными из URL-параметров
+function prefillFormFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentId = urlParams.get('student_id');
+    const className = urlParams.get('class_name');
+    const failedSubjectsStr = urlParams.get('failed_subjects');
+    const satisfactorySubjectsStr = urlParams.get('satisfactory_subjects');
+    const fromAnalysis = urlParams.get('from_analysis') === 'true';
+    
+    if (!studentId || !className) return;
+    
+    const failedSubjects = failedSubjectsStr ? failedSubjectsStr.split(',') : [];
+    const satisfactorySubjects = satisfactorySubjectsStr ? satisfactorySubjectsStr.split(',') : [];
+    
+    console.log('Предзаполнение формы данными из URL:', {
+        studentId,
+        className,
+        failedSubjects,
+        satisfactorySubjects
+    });
+    
+    // Выбираем класс
+    if (classSelect) {
+        for (let i = 0; i < classSelect.options.length; i++) {
+            if (classSelect.options[i].value === className) {
+                classSelect.selectedIndex = i;
+                break;
+            }
+        }
+        // Запускаем событие change для загрузки списка учеников
+        classSelect.dispatchEvent(new Event('change'));
+        
+        // Ждем загрузки списка учеников
+        setTimeout(() => {
+            // Выбираем ученика
+            if (studentSelect) {
+                for (let i = 0; i < studentSelect.options.length; i++) {
+                    if (studentSelect.options[i].value === studentId) {
+                        studentSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+                // Запускаем событие change для загрузки предметов
+                studentSelect.dispatchEvent(new Event('change'));
+                
+                // Ждем загрузки предметов
+                setTimeout(() => {
+                    // Отмечаем предметы с задолженностями
+                    failedSubjects.forEach(subject => {
+                        const checkbox = document.querySelector(`input[name="failed_subjects[]"][value="${subject}"]`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            checkbox.dispatchEvent(new Event('change'));
+                        }
+                    });
+                    
+                    // Отмечаем предметы с тройками
+                    satisfactorySubjects.forEach(subject => {
+                        const checkbox = document.querySelector(`input[name="satisfactory_subjects[]"][value="${subject}"]`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            checkbox.dispatchEvent(new Event('change'));
+                        }
+                    });
+                }, 500);
+            }
+        }, 500);
+    }
+}
+
+// Запускаем функцию предзаполнения при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    prefillFormFromUrl();
+});

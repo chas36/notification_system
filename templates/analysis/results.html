@@ -173,7 +173,7 @@
                 }
             });
         });
-        
+        const createNotificationBtns = document.querySelectorAll('.create-notification-btn');
         // Обработчики для кнопок создания уведомления
         createNotificationBtns.forEach(btn => {
     btn.addEventListener('click', function() {
@@ -204,5 +204,71 @@
         });
     });
 });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Устанавливаем session_id для использования в JS
+        const session_id = "{{ session_id }}";
+        
+        // Обработчики для кнопок просмотра деталей
+        const viewDetailsBtns = document.querySelectorAll('.view-details-btn');
+        
+        viewDetailsBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const studentName = this.getAttribute('data-student');
+                // Преобразуем имя в формат для ID (замена пробелов на дефисы)
+                const studentId = studentName.replace(/\s+/g, '-');
+                
+                // Получаем div с деталями
+                const detailsDiv = document.getElementById(`details-${studentId}`);
+                
+                if (detailsDiv) {
+                    // Скрываем все детали
+                    document.querySelectorAll('.student-details').forEach(div => {
+                        div.classList.add('d-none');
+                    });
+                    
+                    // Показываем детали выбранного ученика
+                    detailsDiv.classList.remove('d-none');
+                    
+                    // Прокручиваем страницу к деталям
+                    detailsDiv.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    console.error(`Не найден элемент с ID: details-${studentId}`);
+                }
+            });
+        });
+        
+        // Определение переменной createNotificationBtns
+        const createNotificationBtns = document.querySelectorAll('.create-notification-btn');
+        
+        // Обработчики для кнопок создания уведомления
+        createNotificationBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const studentName = this.getAttribute('data-student');
+                
+                // Получаем данные ученика для заполнения формы
+                fetch(`/analysis/get_student_data/${encodeURIComponent(studentName)}/${session_id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Перенаправляем на страницу создания уведомления с данными
+                        const url = `/create_notification?student_id=${data.student_id}` + 
+                                  `&class_name=${encodeURIComponent(data.student_class)}` +
+                                  `&failed_subjects=${encodeURIComponent(data.failed_subjects.join(','))}` +
+                                  `&satisfactory_subjects=${encodeURIComponent(data.satisfactory_subjects.join(','))}` +
+                                  `&from_analysis=true`;
+                        
+                        window.location.href = url;
+                    } else {
+                        showToast('Ошибка', data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    showToast('Ошибка', 'Произошла ошибка при получении данных ученика', 'error');
+                });
+            });
+        });
+    });
 </script>
 {% endblock %}

@@ -3,9 +3,10 @@ from werkzeug.utils import secure_filename
 import os
 import json
 import pandas as pd
-import re  # Добавляем импорт re для регулярных выражений
-from utils.excel_analyzer import analyze_excel_files, save_results_to_csv
-from database.db import get_session, get_student_by_name, add_student, get_subject_by_name, create_notification, get_unique_classes_sorted, get_students_by_class_sorted  # Добавляем импорт get_students_by_class_sorted
+import re
+from utils.excel_analyzer import analyze_excel_files, save_results_to_csv, extract_file_dates  # Добавлен extract_file_dates
+from database.db import get_session, get_student_by_name, add_student, get_subject_by_name, create_notification, get_unique_classes_sorted, get_students_by_class_sorted
+from database.models import AnalysisSession  # Добавлен импорт модели AnalysisSession
 import uuid
 
 analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
@@ -249,29 +250,22 @@ def get_student_data(student_name, session_id):
     else:
         student_id = student.id
     
-    # Получаем список предметов с задолженностями и тройками
-    failed_subjects_details = []
-    satisfactory_subjects_details = []
+    # Получаем списки предметов с проблемами
+    failed_subjects = []
+    satisfactory_subjects = []
     
     for result in student_results:
         subject_name = result['Предмет']
         problem_type = result['Тип проблемы']
-        period = result['Период промежуточной аттестации']
-        
-        subject_detail = {
-            'name': subject_name,
-            'period': period
-        }
         
         if 'Задолженность' in problem_type:
-            failed_subjects_details.append(subject_detail)
+            if subject_name not in failed_subjects:
+                failed_subjects.append(subject_name)
         elif problem_type == 'Тройка':
-            satisfactory_subjects_details.append(subject_detail)
+            if subject_name not in satisfactory_subjects:
+                satisfactory_subjects.append(subject_name)
     
-    # Convert to URL-friendly format
-    import json
-    failed_subjects_json = json.dumps(failed_subjects_details)
-    satisfactory_subjects_json = json.dumps(satisfactory_subjects_details)
+    db_session.close()
     
     return jsonify({
         'success': True,
@@ -279,11 +273,7 @@ def get_student_data(student_name, session_id):
         'student_name': student_name,
         'student_class': student_class,
         'failed_subjects': failed_subjects,
-        'satisfactory_subjects': satisfactory_subjects,
-        'failed_subjects_details': failed_subjects_details,
-        'satisfactory_subjects_details': satisfactory_subjects_details,
-        'failed_subjects_json': failed_subjects_json,
-        'satisfactory_subjects_json': satisfactory_subjects_json
+        'satisfactory_subjects': satisfactory_subjects
     })
 
 @analysis_bp.route('/create_notification/<session_id>', methods=['POST'])
