@@ -63,8 +63,33 @@ def analyze_excel_files(folder_path, class_name=None):
         print(f"Загружаем файл: {file_path}")
         try:
             excel_data = pd.ExcelFile(file_path)
-            sheet_name = excel_data.sheet_names[0]  # Предполагается, что нужная информация в первом листе
+            sheet_name = excel_data.sheet_names[0]  # Используем первый лист
             print(f"Используем лист: {sheet_name}")
+            
+            # Читаем первую строку (индекс 0) для извлечения метаданных
+            metadata = pd.read_excel(file_path, sheet_name=sheet_name, nrows=1)
+            
+            # Проверяем, что у нас есть хотя бы 3 столбца
+            if metadata.shape[1] >= 3:
+                # ФИО находится в первой строке, третьей ячейке (индекс 2)
+                student_name = str(metadata.iloc[0, 2])
+                # Класс находится в первой строке, второй ячейке (индекс 1)
+                file_class = str(metadata.iloc[0, 1])
+                
+                print(f"Извлечено из Excel: ФИО ученика: '{student_name}', Класс: '{file_class}'")
+                
+                # Используем класс из файла, если не указан в параметрах
+                if not class_name:
+                    current_class = file_class
+                else:
+                    current_class = class_name
+            else:
+                # Если структура файла не соответствует ожидаемой, используем имя файла
+                student_name = os.path.basename(file_path)
+                print(f"Невозможно извлечь ФИО из Excel. Используем имя файла: {student_name}")
+                current_class = class_name
+            
+            # Дальше читаем основные данные с пропуском первых строк (метаданные)
             data = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=3)
             
             # Переименовываем колонки для удобства
@@ -76,41 +101,6 @@ def analyze_excel_files(folder_path, class_name=None):
                 'Средневзвешенный балл',
                 'Итоговая отметка'
             ]
-            
-            # Извлекаем имя ученика из имени файла
-            match = re.search(r'Отчёт об успеваемости\.\s*(.*?)\s*\.\s*\d+-?[А-Яа-я]', os.path.basename(file_path))
-            if match:
-                student_name = match.group(1)
-            else:
-                # Используем более надежный алгоритм разбора имени файла
-                filename = os.path.basename(file_path)
-                parts = filename.split('.')
-                
-                # Если файл разделен точками и первая часть - "Отчёт об успеваемости"
-                if len(parts) > 2 and 'успеваемости' in parts[0]:
-                    student_name = parts[1].strip()
-                else:
-                    # Пытаемся извлечь имя по другому алгоритму
-                    student_name = re.sub(r'^Отчёт об успеваемости\s*\.?\s*', '', filename)
-                    student_name = re.sub(r'\s*\.\s*\d+-?[А-Яа-я].*$', '', student_name)
-                    
-                # Проверяем, что имя не пустое и не состоит только из класса
-                if not student_name or re.match(r'^\d+-?[А-Яа-я]$', student_name):
-                    # Если не удалось извлечь имя, используем имя файла без расширения
-                    student_name = os.path.splitext(filename)[0]
-            
-            print(f"Имя ученика: {student_name}")
-            
-            # Извлекаем класс ученика, если не указан явно
-            if not class_name:
-                class_match = re.search(r'(\d+[А-Яа-я])', os.path.basename(file_path))
-                if class_match:
-                    extracted_class = class_match.group(1)
-                    current_class = extracted_class
-                else:
-                    current_class = None
-            else:
-                current_class = class_name
             
             # Проходим по всем строкам и ищем тройки и задолженности
             previous_grade = None

@@ -319,52 +319,5 @@ def create_notification_from_analysis(session_id):
             'message': f'Ошибка при создании уведомления: {str(e)}'
         })
 
-@analysis_bp.route('/analyze/<session_id>')
-def analyze(session_id):
-    """Анализ загруженных файлов"""
-    # Существующие проверки сессии...
-    
-    # Анализируем файлы
-    try:
-        results = analyze_excel_files(folder_path, class_name)
-        
-        if not results:
-            flash('Не найдено проблем с успеваемостью в загруженных файлах', 'info')
-            return render_template('analysis/no_results.html')
-        
-        # Логируем результаты для отладки
-        print(f"Анализ завершен успешно. Найдено {len(results)} записей о проблемах.")
-        
-        # Проверяем наличие корректных ФИО
-        unique_names = set(item['ФИО ученика'] for item in results)
-        print(f"Уникальные имена учеников: {unique_names}")
-        
-        # Сохраняем результаты в JSON в сессии
-        session['analysis_results'] = json.dumps(results)
-        
-        # Группируем результаты...
-        students = {}
-        for item in results:
-            student_name = item['ФИО ученика']
-            # Проверка на случай некорректного имени
-            if not student_name or student_name.strip() == "" or re.match(r'^\d+-?[А-Яа-я]$', student_name):
-                print(f"Найдено некорректное имя: '{student_name}'. Используем имя по умолчанию.")
-                student_name = f"Ученик класса {class_name}"
-                
-            # Остальной код группировки...
-            
-        # Остальной код...
-        return render_template('analysis/results.html', 
-                            students=students,
-                            all_students=all_students,
-                            class_name=class_name,
-                            session_id=session_id)
-    
-    except Exception as e:
-        import traceback
-        traceback.print_exc()  # Выводим полный стек ошибки для отладки
-        flash(f'Ошибка при анализе файлов: {str(e)}', 'danger')
-        return redirect(url_for('analysis.index'))
-
 def init_analysis(app):
     app.register_blueprint(analysis_bp)
