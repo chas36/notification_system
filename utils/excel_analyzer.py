@@ -328,3 +328,27 @@ def save_results_to_csv(results, output_path='students_with_problems.csv'):
     else:
         print("Нет результатов для сохранения.")
         return None
+    
+def extract_file_dates(folder_path):
+    """Extracts the earliest and latest dates from Excel files in a folder"""
+    earliest_date = None
+    latest_date = None
+    
+    files_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
+                 if file.endswith('.xlsx') or file.endswith('.xls')]
+    
+    for file_path in files_list:
+        try:
+            # Read header data to extract date
+            header_data = pd.read_excel(file_path, sheet_name=0, nrows=5, header=None)
+            file_date = extract_actuality_date(header_data)
+            
+            if file_date:
+                if earliest_date is None or file_date < earliest_date:
+                    earliest_date = file_date
+                if latest_date is None or file_date > latest_date:
+                    latest_date = file_date
+        except Exception as e:
+            print(f"Error extracting date from {file_path}: {str(e)}")
+    
+    return earliest_date, latest_date

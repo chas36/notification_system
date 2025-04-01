@@ -620,4 +620,50 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500);
         }
     }
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentId = urlParams.get('student_id');
+    const className = urlParams.get('class_name');
+    const failedSubjects = urlParams.get('failed_subjects') ? urlParams.get('failed_subjects').split(',') : [];
+    const satisfactorySubjects = urlParams.get('satisfactory_subjects') ? urlParams.get('satisfactory_subjects').split(',') : [];
+    const failedDetails = urlParams.get('failed_details') ? JSON.parse(decodeURIComponent(urlParams.get('failed_details'))) : [];
+    const satisfactoryDetails = urlParams.get('satisfactory_details') ? JSON.parse(decodeURIComponent(urlParams.get('satisfactory_details'))) : [];
+    const fromAnalysis = urlParams.get('from_analysis') === 'true';
+    
+    // If coming from analysis, pre-fill form fields
+    if (fromAnalysis && studentId && className) {
+        // Select class
+        if (classSelect.querySelector(`option[value="${className}"]`)) {
+            classSelect.value = className;
+            classSelect.dispatchEvent(new Event('change'));
+            
+            // Wait for students to load, then select the student
+            setTimeout(() => {
+                if (studentSelect.querySelector(`option[value="${studentId}"]`)) {
+                    studentSelect.value = studentId;
+                    studentSelect.dispatchEvent(new Event('change'));
+                    
+                    // Wait for subjects to load, then select them
+                    setTimeout(() => {
+                        // Select failed subjects
+                        failedSubjects.forEach(subject => {
+                            const checkbox = document.querySelector(`input[name="failed_subjects[]"][value="${subject}"]`);
+                            if (checkbox) {
+                                checkbox.checked = true;
+                                checkbox.dispatchEvent(new Event('change'));
+                            }
+                        });
+                        
+                        // Select satisfactory subjects
+                        satisfactorySubjects.forEach(subject => {
+                            const checkbox = document.querySelector(`input[name="satisfactory_subjects[]"][value="${subject}"]`);
+                            if (checkbox) {
+                                checkbox.checked = true;
+                                checkbox.dispatchEvent(new Event('change'));
+                            }
+                        });
+                    }, 500);
+                }
+            }, 500);
+        }
+    }
 });

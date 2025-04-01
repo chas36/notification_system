@@ -175,34 +175,34 @@
         });
         
         // Обработчики для кнопок создания уведомления
-        document.querySelectorAll('.create-notification-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const studentName = this.getAttribute('data-student');
-                console.log(`Нажата кнопка "Создать уведомление" для ученика: ${studentName}`);
+        createNotificationBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+        const studentName = this.getAttribute('data-student');
+        
+        // Get student data for pre-filling the form
+        fetch(`/analysis/get_student_data/${encodeURIComponent(studentName)}/${session_id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Redirect to notification creation with detailed data
+                const url = `/create_notification?student_id=${data.student_id}` + 
+                          `&class_name=${encodeURIComponent(data.student_class)}` +
+                          `&failed_subjects=${encodeURIComponent(data.failed_subjects.join(','))}` +
+                          `&satisfactory_subjects=${encodeURIComponent(data.satisfactory_subjects.join(','))}` + 
+                          `&failed_details=${encodeURIComponent(data.failed_subjects_json)}` +
+                          `&satisfactory_details=${encodeURIComponent(data.satisfactory_subjects_json)}` +
+                          `&from_analysis=true`;
                 
-                // Получаем данные ученика для предзаполнения формы
-                fetch(`/analysis/get_student_data/${encodeURIComponent(studentName)}/${session_id}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Успешно получены данные ученика:', data);
-                        
-                        // Формируем URL с параметрами
-                        const url = `/create_notification?student_id=${data.student_id}&failed_subjects=${encodeURIComponent(data.failed_subjects.join(','))}&satisfactory_subjects=${encodeURIComponent(data.satisfactory_subjects.join(','))}`;
-                        
-                        console.log('Переход по URL:', url);
-                        window.location.href = url;
-                    } else {
-                        console.error('Ошибка получения данных:', data.message);
-                        alert(`Ошибка: ${data.message}`);
-                    }
-                })
-                .catch(error => {
-                    console.error('Ошибка запроса:', error);
-                    alert('Произошла ошибка при получении данных ученика');
-                });
-            });
+                window.location.href = url;
+            } else {
+                // Fallback to simple modal if data retrieval fails
+                showToast('Error', data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error', 'An error occurred while retrieving student data', 'error');
         });
     });
+});
 </script>
 {% endblock %}

@@ -5,47 +5,37 @@
 {% block content %}
 <h1>Анализ успеваемости</h1>
 
-<div class="card mb-4">
-    <div class="card-header">
+
         <h5 class="card-title">Загрузка отчетов об успеваемости</h5>
-    </div>
-    <div class="card-body">
-        <div class="alert alert-info">
-            <p>Загрузите Excel-файлы отчетов об успеваемости учеников.</p>
-            <p>Система проанализирует файлы и выявит учеников, имеющих академические задолженности или оценки "3" по профильным предметам.</p>
-        </div>
-        
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label for="classInput" class="form-label">Класс</label>
-                <select class="form-select" id="classInput" name="class_name">
-                    <option value="">Все классы</option>
-                    {% for class_name in classes %}
-                        <option value="{{ class_name }}">{{ class_name }}</option>
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title">Available Analysis Sessions</h5>
+            </div>
+            <div class="card-body">
+                {% if sessions_by_class %}
+                    {% for class_name, sessions in sessions_by_class.items() %}
+                        <h6>{{ class_name }}</h6>
+                        <ul class="list-group mb-3">
+                            {% for session in sessions %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-bold">Date range:</span> {{ session.earliest_date }} - {{ session.latest_date }}
+                                        <small class="text-muted">(Created: {{ session.created_at }})</small>
+                                    </div>
+                                    <a href="{{ url_for('analysis.view_session', session_id=session.id) }}" class="btn btn-primary btn-sm">
+                                        View Results
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
                     {% endfor %}
-                </select>
-                <div class="form-text">Если указан класс, будут учитываться только профильные предметы для данного класса</div>
+                {% else %}
+                    <div class="alert alert-info">
+                        No analysis sessions available. Upload files to create a new session.
+                    </div>
+                {% endif %}
             </div>
-            
-            <div class="mb-3">
-                <label for="fileInput" class="form-label">Выберите файлы Excel</label>
-                <input type="file" class="form-control" id="fileInput" name="files[]" multiple accept=".xlsx, .xls" required>
-            </div>
-            
-            <div class="mb-3">
-                <div class="progress d-none" id="uploadProgress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                </div>
-            </div>
-            
-            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-upload"></i> Загрузить и анализировать
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
+        </div>
 {% endblock %}
 
 {% block extra_js %}

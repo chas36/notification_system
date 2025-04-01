@@ -130,3 +130,16 @@ class ClassProfile(Base):
     
     def __repr__(self):
         return f"<ClassProfile(class_name='{self.class_name}', subject_id={self.subject_id})>"
+    
+class AnalysisSession(Base):
+    __tablename__ = 'analysis_sessions'
+    
+    id = Column(Integer, primary_key=True)
+    class_name = Column(String, nullable=False)
+    folder_path = Column(String, nullable=False)
+    earliest_date = Column(DateTime)
+    latest_date = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<AnalysisSession(class_name='{self.class_name}', earliest_date='{self.earliest_date}', latest_date='{self.latest_date}')>"

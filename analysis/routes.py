@@ -16,10 +16,55 @@ os.makedirs('temp', exist_ok=True)
 
 @analysis_bp.route('/')
 def index():
-    """Главная страница модуля анализа"""
-    # Получаем список классов
+    """Main page of analysis module"""
+    # Get list of classes
     classes = get_unique_classes_sorted()
-    return render_template('analysis/index.html', classes=classes)
+    
+    # Get available analysis sessions by class
+    db_session = get_session()
+    analysis_sessions = db_session.query(AnalysisSession).order_by(
+        AnalysisSession.class_name, 
+        AnalysisSession.latest_date.desc()
+    ).all()
+    
+    # Group sessions by class
+    sessions_by_class = {}
+    for session in analysis_sessions:
+        if session.class_name not in sessions_by_class:
+            sessions_by_class[session.class_name] = []
+        sessions_by_class[session.class_name].append({
+            'id': session.id,
+            'earliest_date': session.earliest_date.strftime('%d.%m.%Y') if session.earliest_date else 'Unknown',
+            'latest_date': session.latest_date.strftime('%d.%m.%Y') if session.latest_date else 'Unknown',
+            'created_at': session.created_at.strftime('%d.%m.%Y %H:%M')
+        })
+    
+    db_session.close()
+    
+    return render_template('analysis/index.html', 
+                           classes=classes,
+                           sessions_by_class=sessions_by_class)
+@analysis_bp.route('/session/<int:session_id>')
+def view_session(session_id):
+    """View existing analysis session"""
+    db_session = get_session()
+    analysis_session = db_session.query(AnalysisSession).get(session_id)
+    
+    if not analysis_session:
+        flash('Analysis session not found', 'danger')
+        return redirect(url_for('analysis.index'))
+    
+    # Set session variables for compatibility with existing code
+    session['analysis_session_id'] = str(analysis_session.id)
+    session['analysis_class_name'] = analysis_session.class_name
+    
+    # Rerun analysis or load cached results
+    results = analyze_excel_files(analysis_session.folder_path, analysis_session.class_name)
+    session['analysis_results'] = json.dumps(results)
+    
+    db_session.close()
+    
+    return redirect(url_for('analysis.analyze', session_id=str(analysis_session.id)))
 
 @analysis_bp.route('/upload', methods=['POST'])
 def upload_files():
@@ -68,7 +113,19 @@ def upload_files():
     
     # Выполняем анализ сразу здесь для ускорения процесса
     results = analyze_excel_files(folder_path, class_name)
+    earliest_date, latest_date = extract_file_dates(folder_path)
     
+    # Store analysis session in database
+    session_db = get_session()
+    analysis_session = AnalysisSession(
+        class_name=class_name,
+        folder_path=folder_path,
+        earliest_date=earliest_date,
+        latest_date=latest_date
+    )
+    session_db.add(analysis_session)
+    session_db.commit()
+    session_db.close()
     # Сохраняем результаты в сессии
     session['analysis_results'] = json.dumps(results)
     
@@ -193,19 +250,28 @@ def get_student_data(student_name, session_id):
         student_id = student.id
     
     # Получаем список предметов с задолженностями и тройками
-    failed_subjects = []
-    satisfactory_subjects = []
+    failed_subjects_details = []
+    satisfactory_subjects_details = []
     
     for result in student_results:
         subject_name = result['Предмет']
         problem_type = result['Тип проблемы']
+        period = result['Период промежуточной аттестации']
         
-        if problem_type == 'Задолженность':
-            failed_subjects.append(subject_name)
+        subject_detail = {
+            'name': subject_name,
+            'period': period
+        }
+        
+        if 'Задолженность' in problem_type:
+            failed_subjects_details.append(subject_detail)
         elif problem_type == 'Тройка':
-            satisfactory_subjects.append(subject_name)
+            satisfactory_subjects_details.append(subject_detail)
     
-    db_session.close()
+    # Convert to URL-friendly format
+    import json
+    failed_subjects_json = json.dumps(failed_subjects_details)
+    satisfactory_subjects_json = json.dumps(satisfactory_subjects_details)
     
     return jsonify({
         'success': True,
@@ -213,7 +279,11 @@ def get_student_data(student_name, session_id):
         'student_name': student_name,
         'student_class': student_class,
         'failed_subjects': failed_subjects,
-        'satisfactory_subjects': satisfactory_subjects
+        'satisfactory_subjects': satisfactory_subjects,
+        'failed_subjects_details': failed_subjects_details,
+        'satisfactory_subjects_details': satisfactory_subjects_details,
+        'failed_subjects_json': failed_subjects_json,
+        'satisfactory_subjects_json': satisfactory_subjects_json
     })
 
 @analysis_bp.route('/create_notification/<session_id>', methods=['POST'])
