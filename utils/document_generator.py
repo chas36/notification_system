@@ -202,25 +202,6 @@ def generate_document(notification_id):
                 # Добавляем пустую строку после таблицы
                 doc.add_paragraph("")
             
-            # Добавляем запись "Зам. директора" и подпись
-            p = doc.add_paragraph("Зам. директора")
-            p.add_tab()
-            p.add_tab()
-            p.add_run("Филиппова Н.А.")
-            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            
-            # Добавляем "Ознакомлены:"
-            p = doc.add_paragraph("\nОзнакомлены:")
-            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            
-            # Добавляем строку для подписи родителя
-            p = doc.add_paragraph("_______________________________")
-            p.add_run("(Ф.И.О. родителя, законного представителя)")
-            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            
-            # Добавляем "Кл. руководитель"
-            p = doc.add_paragraph("Кл. руководитель")
-            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
         else:
             # Если заголовок не найден, добавляем его и весь текст с нуля
             # Но этого не должно происходить, если шаблон верный

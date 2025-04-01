@@ -4,10 +4,12 @@ from .models import Base, Student, Subject, TemplateType, Notification, Notifica
 from config import get_config
 import os
 
+config = get_config()
+DATABASE_URL = config['DATABASE_URL']
+
 def get_engine():
     """Создаем подключение к базе данных"""
-    config = get_config()
-    return create_engine(config.DATABASE_URI)
+    return create_engine(DATABASE_URL)
 
 def init_db():
     """Инициализируем базу данных"""

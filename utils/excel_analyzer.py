@@ -78,15 +78,26 @@ def analyze_excel_files(folder_path, class_name=None):
             ]
             
             # Извлекаем имя ученика из имени файла
-            match = re.search(r'Отчёт об успеваемости\.\s*(.*?)\s*\.\s*\d+-\D', os.path.basename(file_path))
+            match = re.search(r'Отчёт об успеваемости\.\s*(.*?)\s*\.\s*\d+-?[А-Яа-я]', os.path.basename(file_path))
             if match:
                 student_name = match.group(1)
             else:
-                # Альтернативный вариант извлечения имени
-                student_name = os.path.basename(file_path).split('.')[0]
-                # Очищаем от префиксов отчета, если они есть
-                student_name = re.sub(r'^Отчёт об успеваемости\s*\.?\s*', '', student_name)
-                student_name = re.sub(r'\s*\.\s*\d+-\D.*$', '', student_name)
+                # Используем более надежный алгоритм разбора имени файла
+                filename = os.path.basename(file_path)
+                parts = filename.split('.')
+                
+                # Если файл разделен точками и первая часть - "Отчёт об успеваемости"
+                if len(parts) > 2 and 'успеваемости' in parts[0]:
+                    student_name = parts[1].strip()
+                else:
+                    # Пытаемся извлечь имя по другому алгоритму
+                    student_name = re.sub(r'^Отчёт об успеваемости\s*\.?\s*', '', filename)
+                    student_name = re.sub(r'\s*\.\s*\d+-?[А-Яа-я].*$', '', student_name)
+                    
+                # Проверяем, что имя не пустое и не состоит только из класса
+                if not student_name or re.match(r'^\d+-?[А-Яа-я]$', student_name):
+                    # Если не удалось извлечь имя, используем имя файла без расширения
+                    student_name = os.path.splitext(filename)[0]
             
             print(f"Имя ученика: {student_name}")
             
