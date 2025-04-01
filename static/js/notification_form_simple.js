@@ -555,3 +555,69 @@ document.addEventListener('DOMContentLoaded', function() {
         bsToast.show();
     }
 });
+// Заполнение формы данными, полученными из URL
+document.addEventListener('DOMContentLoaded', function() {
+    // Получаем данные из шаблона (переданные с сервера)
+    const prefillDataElement = document.getElementById('prefill-data');
+    
+    if (prefillDataElement) {
+        const prefillData = JSON.parse(prefillDataElement.textContent);
+        console.log('Данные для заполнения формы:', prefillData);
+        
+        // Заполняем класс
+        if (prefillData.class_name) {
+            const classSelect = document.getElementById('classSelect');
+            for (let i = 0; i < classSelect.options.length; i++) {
+                if (classSelect.options[i].value === prefillData.class_name) {
+                    classSelect.selectedIndex = i;
+                    // Запускаем событие изменения для загрузки учеников
+                    classSelect.dispatchEvent(new Event('change'));
+                    break;
+                }
+            }
+            
+            // Дожидаемся загрузки учеников (setTimeout можно заменить на более надежный механизм)
+            setTimeout(function() {
+                // Заполняем ученика
+                if (prefillData.student_id) {
+                    const studentSelect = document.getElementById('studentSelect');
+                    for (let i = 0; i < studentSelect.options.length; i++) {
+                        if (studentSelect.options[i].value == prefillData.student_id) {
+                            studentSelect.selectedIndex = i;
+                            // Запускаем событие изменения для загрузки предметов
+                            studentSelect.dispatchEvent(new Event('change'));
+                            break;
+                        }
+                    }
+                    
+                    // Дожидаемся загрузки предметов
+                    setTimeout(function() {
+                        // Отмечаем предметы с задолженностями
+                        if (prefillData.failed_subjects && prefillData.failed_subjects.length) {
+                            const checkboxes = document.querySelectorAll('input[name="failed_subjects[]"]');
+                            checkboxes.forEach(checkbox => {
+                                if (prefillData.failed_subjects.includes(checkbox.value)) {
+                                    checkbox.checked = true;
+                                    // Запускаем событие change для отображения дополнительных полей
+                                    checkbox.dispatchEvent(new Event('change'));
+                                }
+                            });
+                        }
+                        
+                        // Отмечаем предметы с тройками
+                        if (prefillData.satisfactory_subjects && prefillData.satisfactory_subjects.length) {
+                            const checkboxes = document.querySelectorAll('input[name="satisfactory_subjects[]"]');
+                            checkboxes.forEach(checkbox => {
+                                if (prefillData.satisfactory_subjects.includes(checkbox.value)) {
+                                    checkbox.checked = true;
+                                    // Запускаем событие change для отображения дополнительных полей
+                                    checkbox.dispatchEvent(new Event('change'));
+                                }
+                            });
+                        }
+                    }, 500);
+                }
+            }, 500);
+        }
+    }
+});

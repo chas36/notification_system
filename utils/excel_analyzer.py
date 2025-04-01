@@ -6,6 +6,62 @@ import re
 from database.db import get_session
 from database.models import ClassProfile, Subject
 
+def extract_actuality_date(header_data):
+    """Извлекает дату актуальности данных из второй строки файла"""
+    try:
+        # Пытаемся получить значение из объединенных ячеек в строке 2 (индекс 1)
+        date_text = str(header_data.iloc[1, 0])
+        
+        # Ищем дату в формате ДД.ММ.ГГГГ
+        match = re.search(r'(\d{2}\.\d{2}\.\d{4})', date_text)
+        if match:
+            date_str = match.group(1)
+            # Преобразуем строку даты в объект datetime
+            from datetime import datetime
+            return datetime.strptime(date_str, '%d.%m.%Y')
+        
+        # Если не найдено, ищем дату в других ячейках второй строки
+        for col in range(header_data.shape[1]):
+            cell_text = str(header_data.iloc[1, col])
+            date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', cell_text)
+            if date_match:
+                date_str = date_match.group(1)
+                from datetime import datetime
+                return datetime.strptime(date_str, '%d.%m.%Y')
+        
+        # Если дата не найдена, возвращаем None
+        return None
+    except Exception as e:
+        print(f"Ошибка при извлечении даты актуальности: {str(e)}")
+        return None
+
+def parse_module_date(date_str):
+    """Преобразует дату завершения модуля в объект datetime"""
+    try:
+        if pd.isna(date_str) or not date_str:
+            return None
+            
+        # Проверяем различные форматы даты
+        formats = ['%d.%m.%Y', '%Y-%m-%d', '%d/%m/%Y']
+        from datetime import datetime
+        
+        for fmt in formats:
+            try:
+                return datetime.strptime(str(date_str), fmt)
+            except ValueError:
+                continue
+                
+        # Если не удалось распознать дату, пробуем извлечь её регулярным выражением
+        match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', str(date_str))
+        if match:
+            day, month, year = map(int, match.groups())
+            return datetime(year, month, day)
+            
+        return None
+    except Exception as e:
+        print(f"Ошибка при преобразовании даты модуля '{date_str}': {str(e)}")
+        return None
+
 def get_profile_subjects_for_class(class_name):
     """Получает список профильных предметов для указанного класса"""
     session = get_session()
@@ -154,6 +210,14 @@ def analyze_excel_files(folder_path, class_name=None):
             # Чтение данных об успеваемости - остальная часть кода не меняется
             data = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=3)
             
+            # Извлекаем дату актуальности данных из второй строки файла
+            actuality_date = extract_actuality_date(header_data)
+            if actuality_date:
+                print(f"Извлечена дата актуальности данных: {actuality_date.strftime('%d.%m.%Y')}")
+            else:
+                print("Не удалось извлечь дату актуальности данных, используем текущую дату")
+                from datetime import datetime
+                actuality_date = datetime.now()
             # Переименование колонок и анализ данных - без изменений...
             
             # Переименовываем колонки для удобства
@@ -219,7 +283,26 @@ def analyze_excel_files(folder_path, class_name=None):
         except Exception as e:
             print(f"Ошибка при обработке файла {file_path}: {str(e)}")
             continue
-    
+    # Проверяем случаи, когда оценка не выставлена за завершенный модуль
+    if current_subject in subjects_of_interest and (pd.isna(row['Итоговая отметка']) or row['Итоговая отметка'] == ''):
+        # Проверяем, есть ли дата завершения модуля
+        if pd.notna(row['Дата промежуточной аттестации']) and row['Дата промежуточной аттестации']:
+            # Преобразуем дату завершения модуля в datetime
+            module_date = parse_module_date(row['Дата промежуточной аттестации'])
+            
+            # Если модуль завершился до даты актуальности, а оценки нет - это задолженность
+            if module_date and module_date < actuality_date:
+                students_with_failures.append({
+                    'ФИО ученика': student_name,
+                    'Класс': current_class,
+                    'Предмет': current_subject,
+                    'Период промежуточной аттестации': row['Период промежуточной аттестации'],
+                    'Дата промежуточной аттестации': row['Дата промежуточной аттестации'],
+                    'Итоговая отметка': 'Н/А',  # Не аттестован
+                    'Тип проблемы': 'Задолженность (не выставлена оценка)'
+                })
+                print(f"Найдена задолженность по невыставленной оценке: {student_name}, {current_subject}, {row['Период промежуточной аттестации']}")
+
     # Объединяем списки с тройками и задолженностями
     all_problems = students_with_threes + students_with_failures
     

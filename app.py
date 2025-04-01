@@ -42,15 +42,38 @@ init_analysis(app)
 def index():
     """Главная страница - для всех пользователей направляет на страницу создания уведомления"""
     return redirect(url_for('create_notification'))
-
 @app.route('/create_notification')
 def create_notification():
     """Страница создания уведомления"""
-    from database.db import get_all_template_types
+    from database.db import get_all_template_types, get_student_by_id
     template_types = get_all_template_types()
     
+    # Проверяем, есть ли GET-параметры
+    student_id = request.args.get('student_id')
+    failed_subjects_str = request.args.get('failed_subjects', '')
+    satisfactory_subjects_str = request.args.get('satisfactory_subjects', '')
+    
+    # Преобразуем строки с предметами в списки
+    failed_subjects = failed_subjects_str.split(',') if failed_subjects_str else []
+    satisfactory_subjects = satisfactory_subjects_str.split(',') if satisfactory_subjects_str else []
+    
+    # Подготавливаем данные для JavaScript (чтобы предзаполнить форму)
+    prefill_data = {}
+    if student_id:
+        # Получаем данные о студенте
+        student = get_student_by_id(student_id)
+        if student:
+            prefill_data = {
+                'student_id': student_id,
+                'student_name': student.full_name,
+                'class_name': student.class_name,
+                'failed_subjects': failed_subjects,
+                'satisfactory_subjects': satisfactory_subjects
+            }
+    
     return render_template('create_notification.html', 
-                           template_types=template_types)
+                           template_types=template_types,
+                           prefill_data=prefill_data)
 
 @app.route('/submit_notification', methods=['POST'])
 def submit_notification():

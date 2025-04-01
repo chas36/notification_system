@@ -185,5 +185,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/notification_form_simple.js') }}"></script>
+    <!-- Данные для предзаполнения формы -->
+{% if prefill_data %}
+<script id="prefill-data" type="application/json">
+    {{ prefill_data|tojson }}
+</script>
+{% endif %}
 </body>
 </html>

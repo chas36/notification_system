@@ -142,69 +142,67 @@
 {% endblock %}
 
 {% block extra_js %}
-
-<!-- JavaScript для обработки кнопок -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Устанавливаем session_id для использования в JS
+        const session_id = "{{ session_id }}";
+        
         // Обработчики для кнопок просмотра деталей
-        const viewDetailsButtons = document.querySelectorAll('.view-details-btn');
-        viewDetailsButtons.forEach(btn => {
+        document.querySelectorAll('.view-details-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const studentName = this.getAttribute('data-student');
-                const detailsId = `details-${studentName.replace(/\s+/g, '-')}`;
-                const detailsElement = document.getElementById(detailsId);
+                console.log(`Нажата кнопка "Подробности" для ученика: ${studentName}`);
                 
-                // Скрываем все детали
-                document.querySelectorAll('.student-details').forEach(el => {
-                    el.style.display = 'none';
-                });
+                // Получаем div с деталями, заменяя пробелы на дефисы
+                const detailsDiv = document.getElementById(`details-${studentName.replace(/\s+/g, '-')}`);
                 
-                // Показываем детали выбранного ученика
-                if (detailsElement) {
-                    detailsElement.style.display = 'block';
-                    detailsElement.scrollIntoView({ behavior: 'smooth' });
+                if (detailsDiv) {
+                    // Скрываем все детали
+                    document.querySelectorAll('.student-details').forEach(div => {
+                        div.classList.add('d-none');
+                    });
+                    
+                    // Показываем детали выбранного ученика
+                    detailsDiv.classList.remove('d-none');
+                    
+                    // Прокручиваем страницу к деталям
+                    detailsDiv.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    console.error(`Не найден элемент details-${studentName.replace(/\s+/g, '-')}`);
+                    alert('Не удалось показать детали для этого ученика');
                 }
             });
         });
         
         // Обработчики для кнопок создания уведомления
-        const createNotificationButtons = document.querySelectorAll('.create-notification-btn');
-        createNotificationButtons.forEach(btn => {
+        document.querySelectorAll('.create-notification-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const studentName = this.getAttribute('data-student');
+                console.log(`Нажата кнопка "Создать уведомление" для ученика: ${studentName}`);
                 
-                // Собираем данные об ошибках для этого ученика
-                const studentDetails = {{ students|tojson }};
-                const studentData = studentDetails[studentName];
-                
-                // Создаем URL с параметрами для формы уведомления
-                let url = '/create_notification?student_name=' + encodeURIComponent(studentName);
-                
-                // Добавляем список проблемных предметов
-                const failedSubjects = [];
-                const satisfactorySubjects = [];
-                
-                studentData.problems.forEach(problem => {
-                    if (problem.type === 'Задолженность') {
-                        failedSubjects.push(problem.subject);
-                    } else if (problem.type === 'Тройка') {
-                        satisfactorySubjects.push(problem.subject);
+                // Получаем данные ученика для предзаполнения формы
+                fetch(`/analysis/get_student_data/${encodeURIComponent(studentName)}/${session_id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Успешно получены данные ученика:', data);
+                        
+                        // Формируем URL с параметрами
+                        const url = `/create_notification?student_id=${data.student_id}&failed_subjects=${encodeURIComponent(data.failed_subjects.join(','))}&satisfactory_subjects=${encodeURIComponent(data.satisfactory_subjects.join(','))}`;
+                        
+                        console.log('Переход по URL:', url);
+                        window.location.href = url;
+                    } else {
+                        console.error('Ошибка получения данных:', data.message);
+                        alert(`Ошибка: ${data.message}`);
                     }
+                })
+                .catch(error => {
+                    console.error('Ошибка запроса:', error);
+                    alert('Произошла ошибка при получении данных ученика');
                 });
-                
-                if (failedSubjects.length > 0) {
-                    url += '&failed_subjects=' + encodeURIComponent(failedSubjects.join(','));
-                }
-                
-                if (satisfactorySubjects.length > 0) {
-                    url += '&satisfactory_subjects=' + encodeURIComponent(satisfactorySubjects.join(','));
-                }
-                
-                // Переходим на страницу создания уведомления с предзаполненными данными
-                window.location.href = url;
             });
         });
     });
 </script>
-
 {% endblock %}

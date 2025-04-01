@@ -6,6 +6,7 @@ import pandas as pd
 import re  # Добавляем импорт re для регулярных выражений
 from utils.excel_analyzer import analyze_excel_files, save_results_to_csv
 from database.db import get_session, get_student_by_name, add_student, get_subject_by_name, create_notification, get_unique_classes_sorted, get_students_by_class_sorted  # Добавляем импорт get_students_by_class_sorted
+import uuid
 
 analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 
@@ -37,16 +38,27 @@ def upload_files():
     folder_path = os.path.join('uploads', 'excel_files', session_id)
     os.makedirs(folder_path, exist_ok=True)
     
-    # Сохраняем все файлы
+    # Сохраняем все файлы с уникальными именами
     file_paths = []
-    for file in files:
+    print(f"Загрузка {len(files)} файлов в папку {folder_path}")
+    
+    for index, file in enumerate(files, 1):
         if file.filename == '':
             continue
         
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(folder_path, filename)
+        # Получаем безопасное имя файла
+        original_filename = secure_filename(file.filename)
+        
+        # Добавляем уникальный идентификатор к имени файла
+        file_uuid = uuid.uuid4().hex[:8]  # 8 символов будет достаточно
+        base, ext = os.path.splitext(original_filename)
+        unique_filename = f"{base}_{file_uuid}{ext}"
+        
+        file_path = os.path.join(folder_path, unique_filename)
         file.save(file_path)
         file_paths.append(file_path)
+        
+        print(f"Сохранение файла {index}/{len(files)}: {original_filename} → {unique_filename}")
     
     if not file_paths:
         return jsonify({'success': False, 'message': 'Не загружено ни одного файла'})
