@@ -58,39 +58,103 @@ def analyze_excel_files(folder_path, class_name=None):
                  if file.endswith('.xlsx') or file.endswith('.xls')]
     print(f"Найдено {len(files_list)} файлов Excel для обработки.")
     
+
+    """
+    Анализирует Excel-файлы с успеваемостью и выявляет учеников с задолженностями
+    и тройками по профильным предметам
+    """
+    # Начало функции остается без изменений...
+    
     for file_path in files_list:
         # Загрузка данных из файла
         print(f"Загружаем файл: {file_path}")
         try:
             excel_data = pd.ExcelFile(file_path)
-            sheet_name = excel_data.sheet_names[0]  # Используем первый лист
+            sheet_name = excel_data.sheet_names[0]
             print(f"Используем лист: {sheet_name}")
             
-            # Читаем первую строку (индекс 0) для извлечения метаданных
-            metadata = pd.read_excel(file_path, sheet_name=sheet_name, nrows=1)
+            # Читаем первые несколько строк для анализа структуры
+            header_data = pd.read_excel(file_path, sheet_name=sheet_name, nrows=5, header=None)
             
-            # Проверяем, что у нас есть хотя бы 3 столбца
-            if metadata.shape[1] >= 3:
-                # ФИО находится в первой строке, третьей ячейке (индекс 2)
-                student_name = str(metadata.iloc[0, 2])
-                # Класс находится в первой строке, второй ячейке (индекс 1)
-                file_class = str(metadata.iloc[0, 1])
-                
-                print(f"Извлечено из Excel: ФИО ученика: '{student_name}', Класс: '{file_class}'")
-                
-                # Используем класс из файла, если не указан в параметрах
-                if not class_name:
-                    current_class = file_class
+            # Выводим первые строки для отладки
+            print("Структура первой строки:")
+            for i in range(min(5, header_data.shape[1])):
+                try:
+                    val = header_data.iloc[0, i]
+                    print(f"  Ячейка {i+1}: {val}")
+                except:
+                    print(f"  Ячейка {i+1}: недоступна")
+            
+            # Пытаемся получить ФИО ученика из ячейки D1 (индекс 3)
+            if header_data.shape[1] > 3:  # Убедимся, что есть 4-я колонка
+                student_name = str(header_data.iloc[0, 3])
+                if student_name == 'nan' or pd.isna(student_name):
+                    # Если ячейка D1 пуста, ищем ФИО в других ячейках первой строки
+                    for i in range(header_data.shape[1]):
+                        val = str(header_data.iloc[0, i])
+                        if len(val.split()) >= 2 and val != 'nan' and not pd.isna(val):
+                            student_name = val
+                            print(f"Найдено ФИО в ячейке {i+1}: {student_name}")
+                            break
                 else:
-                    current_class = class_name
+                    print(f"Найдено ФИО ученика в ячейке D1: {student_name}")
             else:
-                # Если структура файла не соответствует ожидаемой, используем имя файла
-                student_name = os.path.basename(file_path)
-                print(f"Невозможно извлечь ФИО из Excel. Используем имя файла: {student_name}")
+                # Если нет 4-й колонки, ищем в других ячейках
+                student_name = "Неизвестный ученик"
+                for i in range(header_data.shape[1]):
+                    val = str(header_data.iloc[0, i])
+                    if len(val.split()) >= 2 and val != 'nan' and not pd.isna(val):
+                        student_name = val
+                        print(f"Найдено ФИО в ячейке {i+1}: {student_name}")
+                        break
+            
+            # Если не удалось найти ФИО, пробуем извлечь из имени файла
+            if student_name == "Неизвестный ученик" or student_name == 'nan':
+                # Извлекаем имя из имени файла
+                filename = os.path.basename(file_path)
+                name_match = re.search(r'Отчёт об успеваемости\.\s*(.*?)\s*\.\s*\d+', filename)
+                if name_match:
+                    student_name = name_match.group(1).strip()
+                    print(f"Извлечено ФИО из имени файла: {student_name}")
+                else:
+                    student_name = os.path.splitext(os.path.basename(file_path))[0]
+                    print(f"Используем имя файла как ФИО: {student_name}")
+            
+            # Получаем класс из данных или используем переданный класс
+            if not class_name:
+                # Если класс не указан в параметрах, ищем в таблице или имени файла
+                file_class = "Неизвестный класс"
+                
+                # Ищем класс в таблице
+                for i in range(min(2, header_data.shape[0])):
+                    for j in range(header_data.shape[1]):
+                        try:
+                            val = str(header_data.iloc[i, j])
+                            if re.match(r'\d+[А-Я]', val):
+                                file_class = val
+                                print(f"Найден класс в таблице: {file_class}")
+                                break
+                        except:
+                            continue
+                
+                # Если не нашли в таблице, ищем в имени файла
+                if file_class == "Неизвестный класс":
+                    filename = os.path.basename(file_path)
+                    class_match = re.search(r'(\d+[А-Я])', filename)
+                    if class_match:
+                        file_class = class_match.group(1)
+                        print(f"Извлечен класс из имени файла: {file_class}")
+                
+                current_class = file_class
+            else:
                 current_class = class_name
             
-            # Дальше читаем основные данные с пропуском первых строк (метаданные)
+            print(f"Итоговые данные для анализа: ФИО ученика: '{student_name}', Класс: '{current_class}'")
+            
+            # Чтение данных об успеваемости - остальная часть кода не меняется
             data = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=3)
+            
+            # Переименование колонок и анализ данных - без изменений...
             
             # Переименовываем колонки для удобства
             data.columns = [
