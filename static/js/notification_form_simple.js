@@ -195,6 +195,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Обработчик отправки формы
+    // Замените существующий обработчик отправки формы в notification_form_simple.js
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -209,8 +210,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Проверка выбора предметов
         const failedSubjects = document.querySelectorAll('input[name="failed_subjects[]"]:checked');
-        if (failedSubjects.length === 0) {
-            showToast('Ошибка', 'Выберите хотя бы один предмет с задолженностью', 'error');
+        const satisfactorySubjects = document.querySelectorAll('input[name="satisfactory_subjects[]"]:checked');
+        
+        // Проверяем, есть ли хотя бы один предмет (либо задолженность, либо тройка)
+        if (failedSubjects.length === 0 && satisfactorySubjects.length === 0) {
+            showToast('Ошибка', 'Выберите хотя бы один предмет с задолженностью или тройкой', 'error');
             return;
         }
         

@@ -278,6 +278,7 @@ def create_notifications_from_csv_data(debts_by_student, template_type_id, perio
             })
     
     return results
+
 def get_unique_classes_sorted():
     """Получает список всех классов, отсортированных по параллели и букве"""
     session = get_session()
@@ -290,11 +291,12 @@ def get_unique_classes_sorted():
     # Функция для извлечения номера параллели и буквы класса
     def extract_class_components(class_name):
         # Разделяем номер и букву
-        parts = class_name.strip().split()
-        if len(parts) == 2:
+        import re
+        match = re.match(r'(\d+)\s*([А-Яа-яA-Za-z]*)', class_name.strip())
+        if match:
             try:
-                number = int(parts[0])  # Номер параллели
-                letter = parts[1]       # Буква класса
+                number = int(match.group(1))  # Номер параллели
+                letter = match.group(2) or ""  # Буква класса (может отсутствовать)
                 return (number, letter)
             except ValueError:
                 # Если не удалось преобразовать в число, возвращаем большое число для сортировки в конец

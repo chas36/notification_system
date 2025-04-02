@@ -88,18 +88,19 @@ def submit_notification():
         if not student_id or not template_type_id or not period:
             return jsonify({'success': False, 'message': 'Заполните все обязательные поля'})
         
-        # Получаем данные о выбранных предметах
+        # Найдите этот блок в функции submit_notification в app.py и замените его
+        # Проверка выбора предметов
         failed_subjects = request.form.getlist('failed_subjects[]')
         satisfactory_subjects = request.form.getlist('satisfactory_subjects[]')
-        
+
         if not failed_subjects and not satisfactory_subjects:
-            return jsonify({'success': False, 'message': 'Выберите хотя бы один предмет'})
-        
+            return jsonify({'success': False, 'message': 'Выберите хотя бы один предмет с задолженностью или тройкой'})
+
         # Получаем ID предметов
         from database.db import get_subject_by_name
         failed_subject_ids = [get_subject_by_name(subject) for subject in failed_subjects]
         satisfactory_subject_ids = [get_subject_by_name(subject) for subject in satisfactory_subjects]
-        
+
         # Все предметы для уведомления
         all_subject_ids = failed_subject_ids + satisfactory_subject_ids
         

@@ -142,5 +142,23 @@
             xhr.send(formData);
         });
     });
+    // Добавьте этот код в соответствующий файл JavaScript или в блок <script> нужного HTML-шаблона
+    document.addEventListener('DOMContentLoaded', function() {
+        // Находим все кнопки просмотра результатов
+        const viewResultButtons = document.querySelectorAll('.view-saved-result-btn');
+        
+        viewResultButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Получаем идентификатор сессии анализа из атрибута data-session-id
+                const sessionId = this.getAttribute('data-session-id');
+                if (sessionId) {
+                    // Перенаправляем на страницу с результатами анализа
+                    window.location.href = `/analysis/analyze/${sessionId}`;
+                } else {
+                    console.error('Не указан идентификатор сессии анализа');
+                }
+            });
+        });
+    });
 </script>
 {% endblock %}
