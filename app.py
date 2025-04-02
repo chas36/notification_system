@@ -292,7 +292,25 @@ def import_debts_route():
         flash('Доступ запрещен. Требуются права администратора.', 'danger')
         return redirect(url_for('create_notification'))
 
+# Добавьте этот метод в app.py в раздел с API-методами
 
+@app.route('/api/get_student/<int:student_id>')
+def api_get_student(student_id):
+    """API для получения данных ученика по ID"""
+    from database.db import get_student_by_id
+    student = get_student_by_id(student_id)
+    
+    if not student:
+        return jsonify({'success': False, 'message': 'Ученик не найден'})
+    
+    return jsonify({
+        'success': True, 
+        'student': {
+            'id': student.id,
+            'full_name': student.full_name,
+            'class_name': student.class_name
+        }
+    })
 
 # Запускаем приложение, если файл выполняется напрямую
 if __name__ == '__main__':

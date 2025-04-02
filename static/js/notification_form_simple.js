@@ -1,6 +1,26 @@
 // static/js/notification_form_simple.js
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Отладочные функции
+    function debug(message, data = null) {
+        console.log('%c[DEBUG] ' + message, 'background: #f0f0f0; color: #333');
+        if (data) {
+            console.log(data);
+        }
+    }
+
+    // Получаем параметры из URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentId = urlParams.get('student_id');
+    const failedSubjectsParam = urlParams.get('failed_subjects');
+    const satisfactorySubjectsParam = urlParams.get('satisfactory_subjects');
+    
+    debug('URL параметры:', { 
+        studentId, 
+        failedSubjectsParam, 
+        satisfactorySubjectsParam 
+    });
+
     // Элементы формы
     const form = document.getElementById('notificationForm');
     const classSelect = document.getElementById('classSelect');
@@ -12,7 +32,105 @@ document.addEventListener('DOMContentLoaded', function() {
     const consultationsScheduleSection = document.getElementById('consultationsScheduleSection');
     
     // Загружаем список классов
-    loadClasses();
+    loadClasses().then(() => {
+        // После загрузки классов, если есть ID студента, выбираем его
+        if (studentId) {
+            debug('Получен ID ученика, загружаем данные', studentId);
+            fillFormWithStudentData(studentId);
+        }
+    });
+    
+    // Функция для заполнения формы данными ученика
+    function fillFormWithStudentData(studentId) {
+        fetch(`/api/get_student/${studentId}`)
+            .then(response => response.json())
+            .then(data => {
+                debug('Ответ API get_student:', data);
+                if (data.success) {
+                    const student = data.student;
+                    
+                    // Выбираем класс ученика
+                    if (classSelect && student.class_name) {
+                        debug('Выбираем класс:', student.class_name);
+                        classSelect.value = student.class_name;
+                        
+                        // Вызываем событие change для загрузки учеников
+                        classSelect.dispatchEvent(new Event('change'));
+                        
+                        // Ждем загрузки списка учеников
+                        setTimeout(() => {
+                            // Выбираем ученика
+                            if (studentSelect) {
+                                debug('Опции в списке учеников:', Array.from(studentSelect.options).map(o => ({ value: o.value, text: o.text })));
+                                studentSelect.value = studentId;
+                                debug('Ученик выбран:', studentSelect.value);
+                                
+                                // Вызываем событие change для загрузки предметов
+                                studentSelect.dispatchEvent(new Event('change'));
+                                
+                                // После загрузки предметов, выбираем предметы
+                                setTimeout(() => {
+                                    debug('Вызываем выбор предметов');
+                                    selectSubjects(failedSubjectsParam, satisfactorySubjectsParam);
+                                }, 1000); // Даем время на загрузку предметов
+                            } else {
+                                debug('Не найден элемент studentSelect');
+                            }
+                        }, 1000); // Даем время на загрузку учеников
+                    }
+                } else {
+                    debug('Ошибка при получении данных ученика');
+                    showToast('Ошибка', 'Не удалось загрузить данные ученика', 'error');
+                }
+            })
+            .catch(error => {
+                debug('Исключение при получении данных ученика:', error);
+                showToast('Ошибка', 'Не удалось загрузить данные ученика', 'error');
+            });
+    }
+    
+    // Функция для выбора предметов
+    function selectSubjects(failedSubjectsParam, satisfactorySubjectsParam) {
+        debug('Выбор предметов с задолженностями и тройками');
+        
+        if (failedSubjectsParam) {
+            const failedSubjects = decodeURIComponent(failedSubjectsParam).split(',');
+            debug('Предметы с задолженностями:', failedSubjects);
+            
+            const failedCheckboxes = document.querySelectorAll('input[name="failed_subjects[]"]');
+            debug('Найдено чекбоксов задолженностей:', failedCheckboxes.length);
+            
+            failedCheckboxes.forEach(checkbox => {
+                debug('Проверяем чекбокс:', checkbox.value);
+                if (failedSubjects.includes(checkbox.value)) {
+                    debug('Выбираем чекбокс:', checkbox.value);
+                    checkbox.checked = true;
+                    // Если есть блок с деталями, показываем его
+                    const subjectDetails = checkbox.closest('.subject-item').querySelector('.subject-details');
+                    if (subjectDetails) {
+                        debug('Показываем детали предмета');
+                        subjectDetails.classList.remove('d-none');
+                    }
+                }
+            });
+        }
+        
+        if (satisfactorySubjectsParam) {
+            const satisfactorySubjects = decodeURIComponent(satisfactorySubjectsParam).split(',');
+            debug('Предметы с тройками:', satisfactorySubjects);
+            
+            const satisfactoryCheckboxes = document.querySelectorAll('input[name="satisfactory_subjects[]"]');
+            debug('Найдено чекбоксов троек:', satisfactoryCheckboxes.length);
+            
+            satisfactoryCheckboxes.forEach(checkbox => {
+                debug('Проверяем чекбокс:', checkbox.value);
+                if (satisfactorySubjects.includes(checkbox.value)) {
+                    debug('Выбираем чекбокс:', checkbox.value);
+                    checkbox.checked = true;
+                }
+            });
+        }
+    }
     
     // Обработчик изменения класса
     classSelect.addEventListener('change', function() {
@@ -131,7 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Функция загрузки списка классов
     function loadClasses() {
-        fetch('/api/get_unique_classes')
+        return fetch('/api/get_unique_classes')
             .then(response => response.json())
             .then(classes => {
                 classSelect.innerHTML = '<option value="">Выберите класс</option>';
@@ -142,9 +260,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     option.textContent = className;
                     classSelect.appendChild(option);
                 });
+                
+                debug('Загружено классов:', classes.length);
+                return classes;
             })
             .catch(error => {
                 showToast('Ошибка', 'Не удалось загрузить список классов', 'error');
+                debug('Ошибка при загрузке классов:', error);
+                return [];
             });
     }
     
@@ -174,9 +297,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         studentSelect.appendChild(option);
                     });
                 }
+                
+                debug('Загружено учеников:', students.length);
             })
             .catch(error => {
                 showToast('Ошибка', 'Не удалось загрузить список учеников', 'error');
+                debug('Ошибка при загрузке учеников:', error);
             });
     }
     
@@ -186,6 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const gradeMatch = className.match(/^(\d+)/);
         if (!gradeMatch || !gradeMatch[1]) {
             showToast('Ошибка', 'Не удалось определить параллель класса', 'error');
+            debug('Не удалось определить параллель класса:', className);
             return;
         }
         
@@ -194,6 +321,8 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/api/get_subjects_by_grade/${grade}`)
             .then(response => response.json())
             .then(subjects => {
+                debug('Загружено предметов:', subjects.length);
+                
                 // Заполняем список предметов с академическими задолженностями
                 const failedSubjectsContainer = document.getElementById('failedSubjectsContainer');
                 failedSubjectsContainer.innerHTML = '';
@@ -259,9 +388,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Добавляем обработчики для чекбоксов предметов
                 addSubjectCheckboxHandlers();
+                
+                // Если есть параметры предметов в URL, выбираем их после загрузки
+                if (failedSubjectsParam || satisfactorySubjectsParam) {
+                    debug('Повторная попытка выбора предметов после загрузки');
+                    selectSubjects(failedSubjectsParam, satisfactorySubjectsParam);
+                }
             })
             .catch(error => {
                 showToast('Ошибка', 'Не удалось загрузить список предметов', 'error');
+                debug('Ошибка при загрузке предметов:', error);
             });
     }
     
@@ -504,6 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 showToast('Ошибка', 'Не удалось загрузить расписание звонков', 'error');
+                debug('Ошибка при загрузке расписания звонков:', error);
             });
     }
     
@@ -532,214 +669,4 @@ document.addEventListener('DOMContentLoaded', function() {
             select.appendChild(option);
         });
     }
-    
-    // Функция для отображения toast-уведомлений
-    function showToast(title, message, type) {
-        const toast = document.getElementById('toast');
-        const toastTitle = document.getElementById('toastTitle');
-        const toastMessage = document.getElementById('toastMessage');
-        
-        toastTitle.textContent = title;
-        toastMessage.textContent = message;
-        
-        // Устанавливаем класс в зависимости от типа уведомления
-        toast.classList.remove('bg-success', 'bg-danger');
-        
-        if (type === 'success') {
-            toast.classList.add('bg-success', 'text-white');
-        } else if (type === 'error') {
-            toast.classList.add('bg-danger', 'text-white');
-        }
-        
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-    }
-});
-// Заполнение формы данными, полученными из URL
-document.addEventListener('DOMContentLoaded', function() {
-    // Получаем данные из шаблона (переданные с сервера)
-    const prefillDataElement = document.getElementById('prefill-data');
-    
-    if (prefillDataElement) {
-        const prefillData = JSON.parse(prefillDataElement.textContent);
-        console.log('Данные для заполнения формы:', prefillData);
-        
-        // Заполняем класс
-        if (prefillData.class_name) {
-            const classSelect = document.getElementById('classSelect');
-            for (let i = 0; i < classSelect.options.length; i++) {
-                if (classSelect.options[i].value === prefillData.class_name) {
-                    classSelect.selectedIndex = i;
-                    // Запускаем событие изменения для загрузки учеников
-                    classSelect.dispatchEvent(new Event('change'));
-                    break;
-                }
-            }
-            
-            // Дожидаемся загрузки учеников (setTimeout можно заменить на более надежный механизм)
-            setTimeout(function() {
-                // Заполняем ученика
-                if (prefillData.student_id) {
-                    const studentSelect = document.getElementById('studentSelect');
-                    for (let i = 0; i < studentSelect.options.length; i++) {
-                        if (studentSelect.options[i].value == prefillData.student_id) {
-                            studentSelect.selectedIndex = i;
-                            // Запускаем событие изменения для загрузки предметов
-                            studentSelect.dispatchEvent(new Event('change'));
-                            break;
-                        }
-                    }
-                    
-                    // Дожидаемся загрузки предметов
-                    setTimeout(function() {
-                        // Отмечаем предметы с задолженностями
-                        if (prefillData.failed_subjects && prefillData.failed_subjects.length) {
-                            const checkboxes = document.querySelectorAll('input[name="failed_subjects[]"]');
-                            checkboxes.forEach(checkbox => {
-                                if (prefillData.failed_subjects.includes(checkbox.value)) {
-                                    checkbox.checked = true;
-                                    // Запускаем событие change для отображения дополнительных полей
-                                    checkbox.dispatchEvent(new Event('change'));
-                                }
-                            });
-                        }
-                        
-                        // Отмечаем предметы с тройками
-                        if (prefillData.satisfactory_subjects && prefillData.satisfactory_subjects.length) {
-                            const checkboxes = document.querySelectorAll('input[name="satisfactory_subjects[]"]');
-                            checkboxes.forEach(checkbox => {
-                                if (prefillData.satisfactory_subjects.includes(checkbox.value)) {
-                                    checkbox.checked = true;
-                                    // Запускаем событие change для отображения дополнительных полей
-                                    checkbox.dispatchEvent(new Event('change'));
-                                }
-                            });
-                        }
-                    }, 500);
-                }
-            }, 500);
-        }
-    }
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentId = urlParams.get('student_id');
-    const className = urlParams.get('class_name');
-    const failedSubjects = urlParams.get('failed_subjects') ? urlParams.get('failed_subjects').split(',') : [];
-    const satisfactorySubjects = urlParams.get('satisfactory_subjects') ? urlParams.get('satisfactory_subjects').split(',') : [];
-    const failedDetails = urlParams.get('failed_details') ? JSON.parse(decodeURIComponent(urlParams.get('failed_details'))) : [];
-    const satisfactoryDetails = urlParams.get('satisfactory_details') ? JSON.parse(decodeURIComponent(urlParams.get('satisfactory_details'))) : [];
-    const fromAnalysis = urlParams.get('from_analysis') === 'true';
-    
-    // If coming from analysis, pre-fill form fields
-    if (fromAnalysis && studentId && className) {
-        // Select class
-        if (classSelect.querySelector(`option[value="${className}"]`)) {
-            classSelect.value = className;
-            classSelect.dispatchEvent(new Event('change'));
-            
-            // Wait for students to load, then select the student
-            setTimeout(() => {
-                if (studentSelect.querySelector(`option[value="${studentId}"]`)) {
-                    studentSelect.value = studentId;
-                    studentSelect.dispatchEvent(new Event('change'));
-                    
-                    // Wait for subjects to load, then select them
-                    setTimeout(() => {
-                        // Select failed subjects
-                        failedSubjects.forEach(subject => {
-                            const checkbox = document.querySelector(`input[name="failed_subjects[]"][value="${subject}"]`);
-                            if (checkbox) {
-                                checkbox.checked = true;
-                                checkbox.dispatchEvent(new Event('change'));
-                            }
-                        });
-                        
-                        // Select satisfactory subjects
-                        satisfactorySubjects.forEach(subject => {
-                            const checkbox = document.querySelector(`input[name="satisfactory_subjects[]"][value="${subject}"]`);
-                            if (checkbox) {
-                                checkbox.checked = true;
-                                checkbox.dispatchEvent(new Event('change'));
-                            }
-                        });
-                    }, 500);
-                }
-            }, 500);
-        }
-    }
-});
-// Добавьте в конец файла notification_form_simple.js
-
-// Функция для предзаполнения формы данными из URL-параметров
-function prefillFormFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentId = urlParams.get('student_id');
-    const className = urlParams.get('class_name');
-    const failedSubjectsStr = urlParams.get('failed_subjects');
-    const satisfactorySubjectsStr = urlParams.get('satisfactory_subjects');
-    const fromAnalysis = urlParams.get('from_analysis') === 'true';
-    
-    if (!studentId || !className) return;
-    
-    const failedSubjects = failedSubjectsStr ? failedSubjectsStr.split(',') : [];
-    const satisfactorySubjects = satisfactorySubjectsStr ? satisfactorySubjectsStr.split(',') : [];
-    
-    console.log('Предзаполнение формы данными из URL:', {
-        studentId,
-        className,
-        failedSubjects,
-        satisfactorySubjects
-    });
-    
-    // Выбираем класс
-    if (classSelect) {
-        for (let i = 0; i < classSelect.options.length; i++) {
-            if (classSelect.options[i].value === className) {
-                classSelect.selectedIndex = i;
-                break;
-            }
-        }
-        // Запускаем событие change для загрузки списка учеников
-        classSelect.dispatchEvent(new Event('change'));
-        
-        // Ждем загрузки списка учеников
-        setTimeout(() => {
-            // Выбираем ученика
-            if (studentSelect) {
-                for (let i = 0; i < studentSelect.options.length; i++) {
-                    if (studentSelect.options[i].value === studentId) {
-                        studentSelect.selectedIndex = i;
-                        break;
-                    }
-                }
-                // Запускаем событие change для загрузки предметов
-                studentSelect.dispatchEvent(new Event('change'));
-                
-                // Ждем загрузки предметов
-                setTimeout(() => {
-                    // Отмечаем предметы с задолженностями
-                    failedSubjects.forEach(subject => {
-                        const checkbox = document.querySelector(`input[name="failed_subjects[]"][value="${subject}"]`);
-                        if (checkbox) {
-                            checkbox.checked = true;
-                            checkbox.dispatchEvent(new Event('change'));
-                        }
-                    });
-                    
-                    // Отмечаем предметы с тройками
-                    satisfactorySubjects.forEach(subject => {
-                        const checkbox = document.querySelector(`input[name="satisfactory_subjects[]"][value="${subject}"]`);
-                        if (checkbox) {
-                            checkbox.checked = true;
-                            checkbox.dispatchEvent(new Event('change'));
-                        }
-                    });
-                }, 500);
-            }
-        }, 500);
-    }
-}
-
-// Запускаем функцию предзаполнения при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
-    prefillFormFromUrl();
 });
